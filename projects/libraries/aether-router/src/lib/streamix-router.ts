@@ -581,15 +581,17 @@ export class StreamixRouter<
 
   constructor(
     private readonly configuration: RouterConfiguration<TRoutes>,
-    appRef: ApplicationRef,
-    injector: EnvironmentInjector,
-    destroyRef: DestroyRef,
-    appBaseHref = '/',
   ) {
-    this.appRef = appRef;
-    this.injector = injector;
-    this.destroyRef = destroyRef;
-    this.appBaseHref = appBaseHref;
+    this.appRef = inject(ApplicationRef);
+    this.injector = inject(EnvironmentInjector);
+    this.destroyRef = inject(DestroyRef);
+    this.appBaseHref =
+    inject(
+      APP_BASE_HREF,
+      {
+        optional: true,
+      },
+    ) ?? '/';
 
     this.registry = createRouteRegistry(this.configuration.routes);
     this.navigateTo =
@@ -1103,15 +1105,6 @@ export function provideStreamixRouter<
       ) =>
         new StreamixRouter<TRoutes>(
           configuration,
-          inject(ApplicationRef),
-          inject(EnvironmentInjector),
-          inject(DestroyRef),
-          inject(
-            APP_BASE_HREF,
-            {
-              optional: true,
-            },
-          ) ?? '/',
         ),
       deps: [
         ROUTER_CONFIGURATION,

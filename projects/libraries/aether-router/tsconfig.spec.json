@@ -1,12 +1,8 @@
 {
   "extends": "../../../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "../../../../",
-    "outDir": "../../../out-tsc/aether-router-spec",
-    "types": [
-      "vitest/globals",
-      "jasmine"
-    ]
+    "rootDir": ".",
+    "outDir": "../../../out-tsc/aether-router-spec"
   },
   "include": [
     "src/**/*.d.ts",

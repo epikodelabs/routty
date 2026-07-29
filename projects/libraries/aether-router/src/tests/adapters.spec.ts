@@ -4,7 +4,7 @@ import {
   adaptRouteComponent,
   bindRouteInputs,
   type StreamixRouteProviders,
-} from '@epikodelabs/streamix/router';
+} from 'aether-router';
 
 @Component({
   template: '',
