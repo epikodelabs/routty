@@ -4,7 +4,7 @@
   "compileOnSave": false,
   "compilerOptions": {
     "paths": {
-      "aether-forms": ["./dist/aether-forms"]
+      "aether-router": ["./dist/aether-router"]
     },
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
@@ -31,10 +31,10 @@
       "path": "./projects/apps/app1/tsconfig.spec.json"
     },
     {
-      "path": "./projects/aether-forms/tsconfig.lib.json"
+      "path": "./projects/libraries/aether-router/tsconfig.lib.json"
     },
     {
-      "path": "./projects/aether-forms/tsconfig.spec.json"
+      "path": "./projects/libraries/aether-router/tsconfig.spec.json"
     }
   ]
 }

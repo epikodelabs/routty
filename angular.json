@@ -6,89 +6,23 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "app1": {
-      "projectType": "application",
-      "schematics": {
-        "@schematics/angular:component": {
-          "style": "scss"
-        }
-      },
-      "root": "projects/apps/app1",
-      "sourceRoot": "projects/apps/app1/src",
-      "prefix": "app",
-      "architect": {
-        "build": {
-          "builder": "@angular/build:application",
-          "options": {
-            "browser": "projects/apps/app1/src/main.ts",
-            "tsConfig": "projects/apps/app1/tsconfig.app.json",
-            "inlineStyleLanguage": "scss",
-            "assets": [
-              {
-                "glob": "**/*",
-                "input": "projects/apps/app1/public"
-              }
-            ],
-            "styles": ["projects/apps/app1/src/styles.scss"]
-          },
-          "configurations": {
-            "production": {
-              "budgets": [
-                {
-                  "type": "initial",
-                  "maximumWarning": "500kB",
-                  "maximumError": "1MB"
-                },
-                {
-                  "type": "anyComponentStyle",
-                  "maximumWarning": "4kB",
-                  "maximumError": "8kB"
-                }
-              ],
-              "outputHashing": "all"
-            },
-            "development": {
-              "optimization": false,
-              "extractLicenses": false,
-              "sourceMap": true
-            }
-          },
-          "defaultConfiguration": "production"
-        },
-        "serve": {
-          "builder": "@angular/build:dev-server",
-          "configurations": {
-            "production": {
-              "buildTarget": "app1:build:production"
-            },
-            "development": {
-              "buildTarget": "app1:build:development"
-            }
-          },
-          "defaultConfiguration": "development"
-        },
-        "test": {
-          "builder": "@angular/build:unit-test",
-          "options": {
-            "tsConfig": "projects/apps/app1/tsconfig.spec.json"
-          }
-        }
-      }
-    },
-    "aether-forms": {
+    "aether-router": {
       "projectType": "library",
-      "root": "projects/libraries/aether-forms",
-      "sourceRoot": "projects/libraries/aether-forms/src",
+      "root": "projects/libraries/aether-router",
+      "sourceRoot": "projects/libraries/aether-router/src",
       "prefix": "lib",
       "architect": {
         "build": {
           "builder": "@angular/build:ng-packagr",
+          "options": {
+            "project": "projects/libraries/aether-router/ng-package.json"
+          },
           "configurations": {
             "production": {
-              "tsConfig": "projects/libraries/aether-forms/tsconfig.lib.prod.json"
+              "tsConfig": "projects/libraries/aether-router/tsconfig.lib.prod.json"
             },
             "development": {
-              "tsConfig": "projects/libraries/aether-forms/tsconfig.lib.json"
+              "tsConfig": "projects/libraries/aether-router/tsconfig.lib.json"
             }
           },
           "defaultConfiguration": "production"
@@ -96,7 +30,7 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
-            "tsConfig": "projects/libraries/aether-forms/tsconfig.spec.json"
+            "tsConfig": "projects/libraries/aether-router/tsconfig.spec.json"
           }
         }
       }
