@@ -1,0 +1,41 @@
+{
+  "srcDirs": [
+    "projects/libraries/aether-router/src/lib",
+    "projects/libraries/aether-router/src/router-lib"
+  ],
+  "testDirs": [
+    "projects/libraries/aether-router/src/tests"
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "**/env.spec.ts"
+  ],
+  "preserveOutputs": false,
+  "outDir": "dist/.vite-jasmine-build",
+  "browser": "chrome",
+  "headless": false,
+  "coverage": false,
+  "port": 8890,
+  "viteBuildOptions": {
+    "target": "es2022",
+    "sourcemap": true,
+    "minify": false,
+    "preserveModules": false,
+    "preserveModulesRoot": "."
+  },
+  "jasmineConfig": {
+    "env": {
+      "stopSpecOnExpectationFailure": false,
+      "random": true,
+      "seed": 0,
+      "timeout": 120000
+    }
+  },
+  "htmlOptions": {
+    "title": "Jasmine Test Runner",
+    "preludeModules": [
+      "@angular/compiler"
+    ]
+  },
+  "suppressConsoleLogs": false
+}

@@ -4,7 +4,8 @@
   "compileOnSave": false,
   "compilerOptions": {
     "paths": {
-      "aether-router": ["./dist/aether-router"]
+      "aether-router": ["./projects/libraries/aether-router/src/public-api.ts"],
+      "@epikodelabs/streamix/router": ["./projects/libraries/aether-router/src/testing/streamix-router-compat.ts"]
     },
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
@@ -24,12 +25,6 @@
   },
   "files": [],
   "references": [
-    {
-      "path": "./projects/apps/app1/tsconfig.app.json"
-    },
-    {
-      "path": "./projects/apps/app1/tsconfig.spec.json"
-    },
     {
       "path": "./projects/libraries/aether-router/tsconfig.lib.json"
     },
