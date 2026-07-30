@@ -38,10 +38,16 @@ This will compile your project and store the build artifacts in the `dist/` dire
 
 ## Running unit tests
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+To execute unit tests with the Jasmine runner, use one of the following commands:
 
 ```bash
-ng test app1
+npm test
+```
+
+or:
+
+```bash
+npm run jasmine
 ```
 
 ## Running end-to-end tests
