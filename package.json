@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
+    "postinstall": "node scripts/patch-testify.mjs",
+    "pretest": "npm run build",
+    "pretest:watch": "npm run build",
+    "prejasmine": "npm run build",
+    "prejasmine:coverage": "npm run build",
     "start": "ng build aether-router --watch --configuration development",
     "build": "ng build aether-router",
     "watch": "ng build aether-router --watch --configuration development",
@@ -20,7 +25,7 @@
     "@angular/forms": "^22.0.0",
     "@angular/platform-browser": "^22.0.0",
     "@angular/router": "^22.0.0",
-    "@epikodelabs/testify": "file:epikodelabs-testify-1.0.34.tgz",
+    "@epikodelabs/testify": "^1.0.34",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

@@ -1,9 +1,9 @@
 {
   "srcDirs": [
-    "src"
+    "./projects/libraries/aether-router/src/lib"
   ],
   "testDirs": [
-    "tests"
+    "./projects/libraries/aether-router/src/tests"
   ],
   "exclude": [
     "**/node_modules/**"
@@ -21,6 +21,13 @@
     "preserveModules": false,
     "preserveModulesRoot": "."
   },
+  "viteConfig": {
+    "resolve": {
+      "alias": {
+        "aether-router": "./dist/aether-router/fesm2022/aether-router.mjs"
+      }
+    }
+  },
   "jasmineConfig": {
     "env": {
       "stopSpecOnExpectationFailure": false,
@@ -31,7 +38,9 @@
   },
   "htmlOptions": {
     "title": "Jasmine Test Runner",
-    "preludeModules": []
+    "preludeModules": [
+      "@angular/compiler"
+    ]
   },
   "suppressConsoleLogs": false
 }

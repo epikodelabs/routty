@@ -1,4 +1,4 @@
-import { createRouter, type Route, type Router, type RouterConfig } from '@epikodelabs/streamix/router';
+import { createRouter, type Route, type Router, type RouterConfig } from 'aether-router';
 import { idescribe } from './env.spec';
 
 function unwrapTestComponent<T>(value: T | { default: T }): T {
