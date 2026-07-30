@@ -17,9 +17,9 @@ import type {
 
 import {
   OUTLET_ACTIVATE_EVENT,
-  OUTLET_ATTRIBUTE,
   OUTLET_DEACTIVATE_EVENT,
   dispatchOutletLifecycleEvent,
+  findContainingOutlet,
   findOutlet,
 } from './router-events';
 
@@ -176,9 +176,7 @@ function createAngularComponent(
 
       const outlet =
         containingOutlet ??
-        host.closest<HTMLElement>(
-          `[${OUTLET_ATTRIBUTE}]`,
-        );
+        findContainingOutlet(host);
 
       if (outlet) {
         dispatchOutletLifecycleEvent(

@@ -1,8 +1,12 @@
 export * from './navigation-types';
-export { StreamixOutlet } from './outlet';
+export { RouterOutlet } from './outlet';
 export * from './query-schema';
 export * from './route-adapter';
 export * from './route-builders';
+export {
+  StreamixRouterLink,
+  StreamixRouterLink as RouterLink,
+} from './router-link';
 export * from './route-types';
 export * from './router-events';
 export * from './router-url';

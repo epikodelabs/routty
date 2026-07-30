@@ -7,10 +7,11 @@ import {
   lazyLayout,
   lazyRoute,
   provideStreamixRouter,
+  RouterOutlet,
   route,
   StreamixRouter,
   type StreamixRoutes,
-} from '@epikodelabs/streamix/router';
+} from 'aether-router';
 
 ensureAngularTestEnvironment();
 
@@ -19,14 +20,16 @@ class HomeComponent {}
 
 @Component({
   standalone: true,
-  template: '<h2>Parent</h2><div data-router-outlet></div>',
+  imports: [RouterOutlet],
+  template: '<h2>Parent</h2><router-outlet />',
   host: { 'parent-cmp': '' },
 })
 class ParentComponent {}
 
 @Component({
   standalone: true,
-  template: '<h2>Shell</h2><div data-router-outlet></div>',
+  imports: [RouterOutlet],
+  template: '<h2>Shell</h2><router-outlet />',
   host: { 'shell-cmp': '' },
 })
 class ShellComponent {}

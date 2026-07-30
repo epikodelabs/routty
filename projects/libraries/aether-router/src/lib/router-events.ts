@@ -1,7 +1,15 @@
 export const OUTLET_ACTIVATE_EVENT = 'vanilla-router-activate';
 export const OUTLET_DEACTIVATE_EVENT = 'vanilla-router-deactivate';
 export const ROUTER_LOCATION_CHANGE_EVENT = 'vanilla-router-locationchange';
-export const OUTLET_ATTRIBUTE = 'data-router-outlet';
+
+function isOutletElement(
+  node: Element,
+): node is HTMLElement {
+  const tagName =
+    node.tagName.toLowerCase();
+
+  return tagName === 'router-outlet';
+}
 
 export function dispatchOutletLifecycleEvent(
   target: EventTarget,
@@ -22,8 +30,8 @@ export function dispatchRouterLocationChange(): void {
 /**
  * Finds a router outlet inside a node.
  *
- * - name === undefined | null | '' → primary (unnamed) outlet
- * - name provided → looks for data-router-outlet="name"
+ * - name === undefined | null | '' -> primary (unnamed) outlet
+ * - name provided -> looks for router-outlet[name="..."]
  */
 export function findOutlet(
   node: Node,
@@ -38,11 +46,13 @@ export function findOutlet(
     return null;
   }
 
-  const targetName = name ?? '';
+  const targetName =
+    name ?? '';
 
   if (
     node instanceof HTMLElement &&
-    node.getAttribute(OUTLET_ATTRIBUTE) === targetName
+    isOutletElement(node) &&
+    (node.getAttribute('name') ?? '') === targetName
   ) {
     return node;
   }
@@ -50,11 +60,33 @@ export function findOutlet(
   return (
     Array.from(
       node.querySelectorAll<HTMLElement>(
-        `[${OUTLET_ATTRIBUTE}]`,
+        'router-outlet',
       ),
     ).find(
       element =>
-        element.getAttribute(OUTLET_ATTRIBUTE) === targetName,
+        isOutletElement(element) &&
+        (element.getAttribute('name') ?? '') === targetName,
     ) ?? null
   );
+}
+
+export function findContainingOutlet(
+  node: Node,
+): HTMLElement | null {
+  let current: Node | null = node;
+
+  while (current) {
+    if (
+      current instanceof HTMLElement &&
+      isOutletElement(current)
+    ) {
+      return current;
+    }
+
+    current =
+      current.parentNode ??
+      ((current as ShadowRoot).host ?? null);
+  }
+
+  return null;
 }
