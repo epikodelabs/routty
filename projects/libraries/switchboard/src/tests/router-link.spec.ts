@@ -8,7 +8,7 @@ import {
   StreamixRouter,
   provideStreamixRouter,
   route,
-} from 'aether-router';
+} from '@epikodelabs/switchboard';
 
 ensureAngularTestEnvironment();
 

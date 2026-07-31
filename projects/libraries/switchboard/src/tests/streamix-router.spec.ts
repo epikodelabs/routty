@@ -11,7 +11,7 @@ import {
   route,
   StreamixRouter,
   type StreamixRoutes,
-} from 'aether-router';
+} from '@epikodelabs/switchboard';
 
 ensureAngularTestEnvironment();
 

@@ -1,7 +1,7 @@
 {
   "extends": "../../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "../../../out-tsc/aether-router",
+    "outDir": "../../../out-tsc/switchboard",
     "declaration": true,
     "declarationMap": true,
     "inlineSources": true,

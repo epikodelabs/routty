@@ -6,23 +6,23 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "aether-router": {
+    "switchboard": {
       "projectType": "library",
-      "root": "projects/libraries/aether-router",
-      "sourceRoot": "projects/libraries/aether-router/src",
+      "root": "projects/libraries/switchboard",
+      "sourceRoot": "projects/libraries/switchboard/src",
       "prefix": "lib",
       "architect": {
         "build": {
           "builder": "@angular/build:ng-packagr",
           "options": {
-            "project": "projects/libraries/aether-router/ng-package.json"
+            "project": "projects/libraries/switchboard/ng-package.json"
           },
           "configurations": {
             "production": {
-              "tsConfig": "projects/libraries/aether-router/tsconfig.lib.prod.json"
+              "tsConfig": "projects/libraries/switchboard/tsconfig.lib.prod.json"
             },
             "development": {
-              "tsConfig": "projects/libraries/aether-router/tsconfig.lib.json"
+              "tsConfig": "projects/libraries/switchboard/tsconfig.lib.json"
             }
           },
           "defaultConfiguration": "production"
@@ -30,7 +30,7 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
-            "tsConfig": "projects/libraries/aether-router/tsconfig.spec.json"
+            "tsConfig": "projects/libraries/switchboard/tsconfig.spec.json"
           }
         }
       }

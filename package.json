@@ -1,6 +1,6 @@
 {
-  "name": "aether-router",
-  "version": "0.0.0",
+  "name": "switchboard",
+  "version": "1.0.1",
   "scripts": {
     "ng": "ng",
     "postinstall": "node scripts/patch-testify.mjs",
@@ -8,9 +8,9 @@
     "pretest:watch": "npm run build",
     "prejasmine": "npm run build",
     "prejasmine:coverage": "npm run build",
-    "start": "ng build aether-router --watch --configuration development",
-    "build": "ng build aether-router",
-    "watch": "ng build aether-router --watch --configuration development",
+    "start": "ng build switchboard --watch --configuration development",
+    "build": "ng build switchboard",
+    "watch": "ng build switchboard --watch --configuration development",
     "test": "testify --headless --browser chrome",
     "test:watch": "testify --browser chrome",
     "jasmine": "testify --headless --browser chrome",
@@ -25,7 +25,7 @@
     "@angular/forms": "^22.0.0",
     "@angular/platform-browser": "^22.0.0",
     "@angular/router": "^22.0.0",
-    "@epikodelabs/testify": "^1.0.34",
+    "@epikodelabs/testify": "^1.0.36",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

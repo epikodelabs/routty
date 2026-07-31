@@ -1,6 +1,6 @@
 {
-  "name": "aether-router",
-  "version": "0.0.1",
+  "name": "@epikodelabs/switchboard",
+  "version": "1.0.1",
   "peerDependencies": {
     "@angular/common": "^22.0.0",
     "@angular/core": "^22.0.0"

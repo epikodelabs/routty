@@ -2,8 +2,8 @@
   "compileOnSave": false,
   "compilerOptions": {
     "paths": {
-      "aether-router": [
-        "./projects/libraries/aether-router/src/public-api.ts"
+      "@epikodelabs/switchboard": [
+        "./projects/libraries/switchboard/src/public-api.ts"
       ]
     },
     "noImplicitOverride": true,
@@ -28,10 +28,10 @@
   "files": [],
   "references": [
     {
-      "path": "./projects/libraries/aether-router/tsconfig.lib.json"
+      "path": "./projects/libraries/switchboard/tsconfig.lib.json"
     },
     {
-      "path": "./projects/libraries/aether-router/tsconfig.spec.json"
+      "path": "./projects/libraries/switchboard/tsconfig.spec.json"
     }
   ]
 }

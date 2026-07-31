@@ -1,4 +1,4 @@
-import { layout, route, s, type StreamixRoutes, type StreamixRouter } from 'aether-router';
+import { layout, route, s, type StreamixRoutes, type StreamixRouter } from '@epikodelabs/switchboard';
 
 class DashboardLayout {}
 class DashboardPage {}
