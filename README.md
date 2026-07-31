@@ -1,65 +1,40 @@
-# App1
+# Switchboard
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.0.8.
+This workspace includes a manual route playground app under `apps/route-playground` for checking real browser navigation scenarios against the Switchboard library.
 
-## Development server
+## Playground
 
-To start a local development server, run:
-
-```bash
-ng serve app1
-```
-
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+Run the sample app with:
 
 ```bash
-ng generate component component-name
+npm run start:playground
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+The playground covers:
+
+- flat layout composition under `/app`
+- typed params and query parsing on `/app/workspace/:projectId`
+- grouped named outlets with a persistent sidebar outlet
+- redirects through `/legacy` and the `/app` index route
+- lazy component loading on `/app/reports`
+- `beforeEnter` and `beforeLeave` behavior on `/app/admin` and `/app/editor/:draftId`
+
+Build the sample app with:
 
 ```bash
-ng generate --help
+npm run build:playground
 ```
 
-## Building
+## Library
 
-To build the project run:
+Build the Switchboard library with:
 
 ```bash
-ng build app1
+npm run build
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the Jasmine runner, use one of the following commands:
+Run the existing library tests with:
 
 ```bash
 npm test
 ```
-
-or:
-
-```bash
-npm run jasmine
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.

@@ -2,9 +2,7 @@
   "compileOnSave": false,
   "compilerOptions": {
     "paths": {
-      "@epikodelabs/switchboard": [
-        "./projects/libraries/switchboard/src/public-api.ts"
-      ]
+      "@epikodelabs/switchboard": ["./projects/libraries/switchboard/src/public-api.ts"]
     },
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
@@ -16,9 +14,7 @@
     "importHelpers": true,
     "target": "ES2022",
     "module": "preserve",
-    "types": [
-      "jasmine"
-    ]
+    "types": ["jasmine"]
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,
@@ -32,6 +28,9 @@
     },
     {
       "path": "./projects/libraries/switchboard/tsconfig.spec.json"
+    },
+    {
+      "path": "./apps/route-playground/tsconfig.app.json"
     }
   ]
 }

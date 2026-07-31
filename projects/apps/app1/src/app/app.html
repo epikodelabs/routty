@@ -1,0 +1,28 @@
+<div class="app-frame">
+  <header class="masthead">
+    <a class="brand" [routerLink]="'/'">
+      <span class="brand-mark">SB</span>
+      <span>
+        <strong>Switchboard</strong>
+        <small>Route Playground</small>
+      </span>
+    </a>
+
+    <nav class="top-nav" aria-label="Primary navigation">
+      <a [routerLink]="'/'">Overview</a>
+      <a
+        [routerLink]="{
+          name: 'workspace',
+          params: { projectId: 101 },
+          query: { view: 'overview', page: 1, filters: ['open', 'recent'] }
+        }"
+      >
+        Workspace
+      </a>
+      <a [routerLink]="{ name: 'reports' }">Lazy Reports</a>
+      <a [routerLink]="'/legacy'">Redirect</a>
+    </nav>
+  </header>
+
+  <router-outlet />
+</div>

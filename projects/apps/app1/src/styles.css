@@ -1,0 +1,61 @@
+:root {
+  color-scheme: light;
+  --app-bg:
+    radial-gradient(circle at top left, rgb(222 234 255 / 0.95), transparent 32%),
+    radial-gradient(circle at top right, rgb(254 232 201 / 0.9), transparent 28%),
+    linear-gradient(180deg, #f5f7fb 0%, #edf2f9 100%);
+  --panel-color: rgb(255 255 255 / 0.76);
+  --panel-strong: rgb(255 255 255 / 0.92);
+  --border-color: rgb(54 86 131 / 0.12);
+  --accent-color: #2b5ce6;
+  --accent-deep: #1236b8;
+  --accent-soft: rgb(43 92 230 / 0.1);
+  --warning-soft: rgb(220 124 0 / 0.12);
+  --ink-strong: #162033;
+  --ink-body: #31405d;
+  --ink-soft: #61708c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--app-bg);
+  color: var(--ink-body);
+  font-family:
+    'Segoe UI Variable Text',
+    'Bahnschrift',
+    'Trebuchet MS',
+    sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+strong {
+  color: var(--ink-strong);
+  font-family:
+    'Aptos Display',
+    'Franklin Gothic Medium',
+    'Segoe UI Variable Display',
+    sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
