@@ -3,14 +3,6 @@
 {
   "extends": "../../../tsconfig.json",
   "compilerOptions": {
-    "paths": {
-      "waypoint": [
-        "../../libraries/waypoint/src/public-api.ts"
-      ],
-      "@epikodelabs/switchboard": [
-        "../../libraries/waypoint/src/public-api.ts"
-      ]
-    },
     "types": []
   },
   "include": ["src/**/*.ts"],

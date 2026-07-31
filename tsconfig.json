@@ -3,7 +3,7 @@
   "compilerOptions": {
     "paths": {
       "@epikodelabs/switchboard": [
-        "./dist/switchboard"
+        "./projects/libraries/switchboard/src/public-api.ts"
       ]
     },
     "noImplicitOverride": true,
