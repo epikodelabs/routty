@@ -70,6 +70,7 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
+            "outputPath": "dist/app1",
             "browser": "projects/apps/app1/src/main.ts",
             "tsConfig": "projects/apps/app1/tsconfig.app.json",
             "assets": [

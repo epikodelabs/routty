@@ -48,7 +48,7 @@ export class DemoSessionService {
   createAdminAudit(): AdminAudit {
     return {
       accessGranted: this.adminAccess(),
-      reviewedBy: 'route-playground',
+      reviewedBy: 'app1',
       workspaceLoads: this.workspaceLoads(),
     };
   }

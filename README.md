@@ -1,6 +1,6 @@
 # Switchboard
 
-This workspace includes a manual route playground app under `apps/route-playground` for checking real browser navigation scenarios against the Switchboard library.
+This workspace includes a manual route playground app under `projects/apps/app1` for checking real browser navigation scenarios against the Switchboard library.
 
 ## Playground
 

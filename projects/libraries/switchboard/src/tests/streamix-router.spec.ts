@@ -35,6 +35,14 @@ class ParentComponent {}
 class ShellComponent {}
 
 @Component({
+  standalone: true,
+  imports: [RouterOutlet],
+  template: '<h2>Shell</h2><router-outlet /><router-outlet name="sidebar" />',
+  host: { 'shell-sidebar-cmp': '' },
+})
+class ShellWithSidebarComponent {}
+
+@Component({
   standalone: true, template: '<h3>Child</h3>',
   host: { 'child-cmp': '' }
 })
@@ -57,6 +65,7 @@ describe('StreamixRouter: flat routes and layouts', () => {
         HomeComponent,
         ParentComponent,
         ShellComponent,
+        ShellWithSidebarComponent,
         ChildComponent,
         SettingsComponent,
       ],
@@ -252,5 +261,23 @@ describe('StreamixRouter: flat routes and layouts', () => {
     expect(sidebarOutlet.innerHTML).toContain('<h3>Settings</h3>');
 
     router.disconnect('sidebar', sidebarOutlet);
+  });
+
+  it('connects named outlets declared inside a routed layout automatically', async () => {
+    const routes = [
+      layout('/app', ShellWithSidebarComponent, [
+        route('/workspace', ChildComponent),
+        route('/workspace', SettingsComponent, { outlet: 'sidebar' }),
+      ]),
+    ] as const satisfies StreamixRoutes;
+
+    bootstrap(routes);
+    await navigate('/app/workspace');
+
+    const content = getOutletContent();
+    expect(content).toContain('<h2>Shell</h2>');
+    expect(content).toContain('<h3>Child</h3>');
+    expect(content).toContain('<h3>Settings</h3>');
+    expect(router.state.path).toBe('/app/workspace');
   });
 });

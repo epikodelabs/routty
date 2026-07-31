@@ -2,7 +2,9 @@
   "compileOnSave": false,
   "compilerOptions": {
     "paths": {
-      "@epikodelabs/switchboard": ["./projects/libraries/switchboard/src/public-api.ts"]
+      "@epikodelabs/switchboard": [
+        "./dist/switchboard"
+      ]
     },
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
@@ -30,7 +32,7 @@
       "path": "./projects/libraries/switchboard/tsconfig.spec.json"
     },
     {
-      "path": "./apps/route-playground/tsconfig.app.json"
+      "path": "./projects/apps/app1/tsconfig.app.json"
     }
   ]
 }
