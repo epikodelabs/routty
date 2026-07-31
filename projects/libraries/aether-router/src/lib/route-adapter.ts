@@ -59,14 +59,30 @@ export function bindRouteInputs(
   }
 
   const data = route.data ?? {};
-  const values = {
-    ...route.params,
-    ...route.query,
-    ...data,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ...((data as any)?.__params ?? {}),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ...((data as any)?.__query ?? {}),
+  // Parsed route inputs stay grouped by their source so component bindings are
+  // explicit and collision-free.
+  const values: Record<string, unknown> = {
+    url: route.url,
+    path: route.path,
+    params: {
+      ...route.params,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...(((data as any)?.__params ?? {}) as Record<string, unknown>),
+    },
+    query: {
+      ...route.query,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...(((data as any)?.__query ?? {}) as Record<string, unknown>),
+    },
+    data: Object.fromEntries(
+      Object.entries(data).filter(
+        ([key]) =>
+          key !== '__params' &&
+          key !== '__query',
+      ),
+    ),
+    historyState: route.historyState,
+    config: route.config,
   };
 
   for (const input of inputs) {

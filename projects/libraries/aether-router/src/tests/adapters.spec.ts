@@ -26,16 +26,17 @@ function createRoute(
 }
 
 describe('Streamix router adapters', () => {
-  it('binds component inputs by template name first and falls back to prop name', () => {
+  it('binds route inputs by source instead of flattening them', () => {
     const target = {
       setInput: jasmine.createSpy('setInput'),
     };
 
     @Component({ template: '' })
     class TestInputsComponent {
-      @Input('project-id') projectId!: number;
-      @Input() user!: string;
-      @Input() missing!: string;
+      @Input() params!: Record<string, unknown>;
+      @Input() query!: Record<string, unknown>;
+      @Input() data!: Record<string, unknown>;
+      @Input() projectId!: number;
     }
 
     const route = createRoute({
@@ -62,15 +63,30 @@ describe('Streamix router adapters', () => {
 
     bindRouteInputs(target, TestInputsComponent, route);
 
-    expect(target.setInput).toHaveBeenCalledTimes(2);
+    expect(target.setInput).toHaveBeenCalledTimes(3);
     expect(target.setInput).toHaveBeenCalledWith(
-      'project-id',
-      42,
+      'params',
+      {
+        projectId: 42,
+        section: 'overview',
+      },
     );
     expect(target.setInput).toHaveBeenCalledWith(
-      'user',
-      'Ada',
+      'query',
+      {
+        tab: 'settings',
+        sort: 'oldest',
+      },
     );
+    expect(target.setInput).toHaveBeenCalledWith(
+      'data',
+      {
+        'project-id': 42,
+        user: 'Ada',
+        sort: 'recent',
+      },
+    );
+    expect(target.setInput).not.toHaveBeenCalledWith('projectId', jasmine.anything());
   });
 
   it('returns the renderer-produced route component and passes route providers', () => {
