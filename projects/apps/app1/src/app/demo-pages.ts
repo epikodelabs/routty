@@ -156,6 +156,7 @@ const sidebarStyles = `
 
 @Component({
   standalone: true,
+  selector: 'app-intro-page',
   imports: [StreamixRouterLink],
   template: `
     <section class="hero">
@@ -344,6 +345,7 @@ export class IntroPage {
 
 @Component({
   standalone: true,
+  selector: 'app-demo-shell',
   imports: [
     RouterOutlet,
     StreamixRouterLink,
@@ -572,6 +574,7 @@ export class DemoShellComponent {
 
 @Component({
   standalone: true,
+  selector: 'app-workspace-page',
   imports: [StreamixRouterLink],
   template: `
     <section class="page">
@@ -699,6 +702,7 @@ export class WorkspacePage {
 
 @Component({
   standalone: true,
+  selector: 'app-workspace-sidebar',
   imports: [StreamixRouterLink],
   template: `
     <section class="sidebar-card">
@@ -751,6 +755,7 @@ export class WorkspaceSidebarComponent {
 
 @Component({
   standalone: true,
+  selector: 'app-settings-page',
   imports: [StreamixRouterLink],
   template: `
     <section class="page">
@@ -817,6 +822,7 @@ export class SettingsPage {
 
 @Component({
   standalone: true,
+  selector: 'app-settings-sidebar',
   template: `
     <section class="sidebar-card">
       <h3>Settings sidebar</h3>
@@ -836,6 +842,7 @@ export class SettingsSidebarComponent {}
 
 @Component({
   standalone: true,
+  selector: 'app-editor-page',
   imports: [StreamixRouterLink],
   template: `
     <section class="page">
@@ -915,6 +922,7 @@ export class EditorPage {
 
 @Component({
   standalone: true,
+  selector: 'app-editor-sidebar',
   template: `
     <section class="sidebar-card">
       <h3>Editor sidebar</h3>
