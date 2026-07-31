@@ -1,9 +1,9 @@
 {
   "srcDirs": [
-    "./projects/libraries/aether-router/src/lib"
+    "./projects/libraries/switchboard/src/lib"
   ],
   "testDirs": [
-    "./projects/libraries/aether-router/src/tests"
+    "./projects/libraries/switchboard/src/tests"
   ],
   "exclude": [
     "**/node_modules/**"
@@ -24,7 +24,7 @@
   "viteConfig": {
     "resolve": {
       "alias": {
-        "aether-router": "./dist/aether-router/fesm2022/aether-router.mjs"
+        "@epikodelabs/switchboard": "./dist/switchboard/fesm2022/epikodelabs-switchboard.mjs"
       }
     }
   },
