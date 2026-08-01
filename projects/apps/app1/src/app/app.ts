@@ -6,7 +6,7 @@ import {
   RouterOutlet,
   StreamixRouterLink,
 } from '@epikodelabs/switchboard';
-import { DemoSessionService } from './demo-session.service';
+import { DemoSessionService, DemoUser } from './demo-session.service';
 
 @Component({
   selector: 'app-root',
@@ -20,4 +20,8 @@ import { DemoSessionService } from './demo-session.service';
 })
 export class App {
   readonly session = inject(DemoSessionService);
+
+  get currentUser(): DemoUser {
+    return this.session.currentUser();
+  }
 }
