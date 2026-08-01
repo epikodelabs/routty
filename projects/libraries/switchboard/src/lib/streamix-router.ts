@@ -38,8 +38,6 @@ import {
 } from './route-renderer';
 
 import type {
-  BeforeEnter,
-  BeforeLeave,
   MaybePromise,
   StreamixLayout,
   StreamixLayoutOptions,
@@ -74,6 +72,8 @@ import {
 
 import {
   LoadedRoute,
+  type CanActivateFn,
+  type CanDeactivateFn,
   createRouter,
   type ActivatedRoute,
   type NavigationContext,
@@ -241,9 +241,9 @@ function execute<
   );
 }
 
-function adaptBeforeEnter(
+function adaptCanActivate(
   handlers:
-    readonly BeforeEnter[] |
+    readonly CanActivateFn[] |
     undefined,
   injector:
     EnvironmentInjector,
@@ -268,14 +268,16 @@ function adaptBeforeEnter(
             'object' &&
           'redirectTo' in value
         ) {
+          const rawRedirect =
+            value.redirectTo as any;
+          const redirectTo =
+            rawRedirect instanceof URL
+              ? rawRedirect.href
+              : String(rawRedirect);
+
           return {
             ...value,
-            redirectTo:
-              value.redirectTo
-                instanceof URL
-                ? value.redirectTo
-                    .href
-                : value.redirectTo,
+            redirectTo,
           };
         }
 
@@ -286,9 +288,9 @@ function adaptBeforeEnter(
   );
 }
 
-function adaptBeforeLeave(
+function adaptCanDeactivate(
   handlers:
-    readonly BeforeLeave[] |
+    readonly CanDeactivateFn[] |
     undefined,
   injector:
     EnvironmentInjector,
@@ -313,14 +315,16 @@ function adaptBeforeLeave(
             'object' &&
           'redirectTo' in value
         ) {
+          const rawRedirect =
+            value.redirectTo as any;
+          const redirectTo =
+            rawRedirect instanceof URL
+              ? rawRedirect.href
+              : String(rawRedirect);
+
           return {
             ...value,
-            redirectTo:
-              value.redirectTo
-                instanceof URL
-                ? value.redirectTo
-                    .href
-                : value.redirectTo,
+            redirectTo,
           };
         }
 
@@ -459,8 +463,8 @@ function adaptRoute(
                 tokens,
                 views,
               ),
-        canActivate: adaptBeforeEnter(route.beforeEnter, injector),
-        canDeactivate: adaptBeforeLeave(route.beforeLeave, injector),
+        canActivate: adaptCanActivate(route.canActivate, injector),
+        canDeactivate: adaptCanDeactivate(route.canDeactivate, injector),
         resolve: adaptLoaders(route, injector),
         parseParams: adaptParamsParser(route, injector),
         parseQuery: adaptQueryParser(route, injector),

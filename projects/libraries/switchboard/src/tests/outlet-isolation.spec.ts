@@ -2,7 +2,7 @@ import { ensureAngularTestEnvironment } from './angular-testbed.init';
 
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { RouterOutlet } from '@epikodelabs/switchboard';
+import { RouterOutlet } from 'switchboard';
 
 ensureAngularTestEnvironment();
 

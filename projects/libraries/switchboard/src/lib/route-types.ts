@@ -1,6 +1,10 @@
 import type { EnvironmentProviders, Provider, Type } from '@angular/core';
 import type { ParamSchemaRecord, QuerySchemaRecord } from './query-schema';
-import type { DeactivationContext, NavigationContext } from './vanilla-router';
+import type {
+  CanActivateFn as RouterCanActivateFn,
+  CanDeactivateFn as RouterCanDeactivateFn,
+  NavigationContext,
+} from './vanilla-router';
 
 export type MaybePromise<T> = T | PromiseLike<T>;
 export type Lazy<T> = () => MaybePromise<T | { readonly default: T }>;
@@ -12,14 +16,6 @@ export type RouteRedirect = {
   readonly redirectTo: string | URL;
   readonly replace?: boolean;
 };
-
-export type BeforeEnter = (
-  context: NavigationContext,
-) => MaybePromise<boolean | string | URL | RouteRedirect>;
-
-export type BeforeLeave = (
-  context: DeactivationContext,
-) => MaybePromise<boolean | string | URL | RouteRedirect>;
 
 export type RouteLoader<T = unknown> = (
   context: NavigationContext,
@@ -55,8 +51,8 @@ export interface StreamixRoute<
   readonly data?: Readonly<Record<string, unknown>>;
   readonly loadComponent?: Lazy<Type<unknown>>;
   readonly providers?: StreamixRouteProviders;
-  readonly beforeEnter?: readonly BeforeEnter[];
-  readonly beforeLeave?: readonly BeforeLeave[];
+  readonly canActivate?: readonly RouterCanActivateFn[];
+  readonly canDeactivate?: readonly RouterCanDeactivateFn[];
   readonly resolve?: RouteLoaders;
 }
 

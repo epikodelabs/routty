@@ -1,4 +1,4 @@
-import { layout, route, s, type StreamixRoutes, type StreamixRouter } from '@epikodelabs/switchboard';
+import { layout, route, s, type StreamixRoutes, type StreamixRouter } from 'switchboard';
 
 class DashboardLayout {}
 class DashboardPage {}

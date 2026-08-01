@@ -11,7 +11,7 @@ import {
   route,
   StreamixRouter,
   type StreamixRoutes,
-} from '@epikodelabs/switchboard';
+} from 'switchboard';
 
 ensureAngularTestEnvironment();
 

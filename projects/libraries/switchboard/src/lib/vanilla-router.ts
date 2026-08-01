@@ -66,13 +66,13 @@ export type GuardResult =
   | string
   | { redirectTo: string; replace?: boolean };
 
-export type CanActivate =
-  | ((route: NavigationContext) => MaybePromise<GuardResult>)
-  | { canActivate(route: NavigationContext): MaybePromise<GuardResult> };
+export type CanActivateFn = (
+  route: NavigationContext,
+) => MaybePromise<GuardResult>;
 
-export type CanDeactivate =
-  | ((route: DeactivationContext) => MaybePromise<GuardResult>)
-  | { canDeactivate(route: DeactivationContext): MaybePromise<GuardResult> };
+export type CanDeactivateFn = (
+  route: DeactivationContext,
+) => MaybePromise<GuardResult>;
 
 export type Resolve<T = unknown> =
   | ((route: NavigationContext) => MaybePromise<T>)
@@ -96,8 +96,8 @@ export type ParseRouteQuery = (
 
 export interface LoadedRoute {
   readonly component?: RouteComponent;
-  readonly canActivate?: CanActivate[];
-  readonly canDeactivate?: CanDeactivate[];
+  readonly canActivate?: CanActivateFn[];
+  readonly canDeactivate?: CanDeactivateFn[];
   readonly resolve?: Record<string, Resolve>;
   readonly parseParams?: ParseRouteParams;
   readonly parseQuery?: ParseRouteQuery;
@@ -114,8 +114,8 @@ export interface Route {
   data?: Record<string, unknown>;
   preload?: boolean;
   viewTransition?: boolean;
-  canActivate?: CanActivate[];
-  canDeactivate?: CanDeactivate[];
+  canActivate?: CanActivateFn[];
+  canDeactivate?: CanDeactivateFn[];
   resolve?: Record<string, Resolve>;
 }
 
@@ -333,15 +333,18 @@ function readRawQuery(
 }
 
 
-function executeGuard(guard: CanActivate, route: NavigationContext): MaybePromise<GuardResult> {
-  return typeof guard === 'function' ? guard(route) : guard.canActivate(route);
+function executeGuard(
+  guard: CanActivateFn,
+  route: NavigationContext,
+): MaybePromise<GuardResult> {
+  return guard(route);
 }
 
 function executeDeactivationGuard(
-  guard: CanDeactivate,
+  guard: CanDeactivateFn,
   route: DeactivationContext
 ): MaybePromise<GuardResult> {
-  return typeof guard === 'function' ? guard(route) : guard.canDeactivate(route);
+  return guard(route);
 }
 
 function executeResolver(resolver: Resolve, route: NavigationContext): MaybePromise<unknown> {

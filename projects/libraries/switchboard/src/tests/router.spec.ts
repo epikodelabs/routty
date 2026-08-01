@@ -1,4 +1,4 @@
-import { createRouter, type Route, type Router, type RouterConfig } from '@epikodelabs/switchboard';
+import { createRouter, type Route, type Router, type RouterConfig } from 'switchboard';
 import { idescribe } from './env.spec';
 
 function unwrapTestComponent<T>(value: T | { default: T }): T {

@@ -76,7 +76,7 @@ export const routes = [
       querySchema: {
         mode: s.string('write'),
       },
-      beforeLeave: [
+      canDeactivate: [
         () => {
           const session = inject(DemoSessionService);
 
@@ -104,7 +104,7 @@ export const routes = [
     }),
     route('/admin', AdminPage, {
       name: 'admin',
-      beforeEnter: [
+      canActivate: [
         () => {
           const session = inject(DemoSessionService);
 
