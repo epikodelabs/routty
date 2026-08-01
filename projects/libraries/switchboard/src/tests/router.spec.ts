@@ -2355,6 +2355,40 @@ idescribe('Router', () => {
             expect(destroyed.length).toBe(2);
             expect((router.state.error as Error).message).toBe('Commit failed');
         });
+
+        it('should skip native view transitions for grouped named outlet commits', async () => {
+            const transitionDocument = document as Document & {
+                startViewTransition?: (callback: () => void | PromiseLike<void>) => {
+                    finished: Promise<void>;
+                };
+            };
+            const original = transitionDocument.startViewTransition;
+            const startViewTransition = jasmine.createSpy('startViewTransition')
+                .and.callFake((callback: () => void | PromiseLike<void>) => {
+                void callback();
+                return { finished: Promise.resolve() };
+            });
+            transitionDocument.startViewTransition = startViewTransition;
+
+            try {
+                router = createRouter({
+                    routes: [groupedRoute()],
+                    viewTransitions: true,
+                    commit: outlets => {
+                        for (const current of outlets) {
+                            (current.name === 'sidebar' ? document.createElement('div') : outlet)
+                                .replaceChildren(current.node);
+                        }
+                    }
+                });
+
+                expect(await router.navigate('/project/42')).toBeTrue();
+                expect(startViewTransition).not.toHaveBeenCalled();
+            }
+            finally {
+                transitionDocument.startViewTransition = original;
+            }
+        });
     });
 
 });

@@ -37,14 +37,15 @@ class ShellComponent {}
 @Component({
   standalone: true,
   imports: [RouterOutlet],
-  template: '<h2>Shell</h2><router-outlet /><router-outlet name="sidebar" />',
+  template: '<h2>Shell</h2><router-outlet name="sidebar" /><router-outlet />',
   host: { 'shell-sidebar-cmp': '' },
 })
 class ShellWithSidebarComponent {}
 
 @Component({
-  standalone: true, template: '<h3>Child</h3>',
-  host: { 'child-cmp': '' }
+  standalone: true,
+  template: '<h3>Child</h3>',
+  host: { 'child-cmp': '' },
 })
 class ChildComponent {}
 
@@ -99,9 +100,7 @@ describe('StreamixRouter: flat routes and layouts', () => {
   });
 
   it('renders a leaf route without a layout', async () => {
-    const routes = [
-      route('/', HomeComponent),
-    ] as const satisfies StreamixRoutes;
+    const routes = [route('/', HomeComponent)] as const satisfies StreamixRoutes;
 
     bootstrap(routes);
     await navigate('/');
@@ -139,7 +138,7 @@ describe('StreamixRouter: flat routes and layouts', () => {
     expect(content).toContain('<h3>Child</h3>');
   });
 
-  it('inherits the layout path prefix' , async () => {
+  it('inherits the layout path prefix', async () => {
     const routes = [
       layout('/admin', ParentComponent, [
         route('/settings', SettingsComponent),
@@ -170,11 +169,9 @@ describe('StreamixRouter: flat routes and layouts', () => {
 
   it('renders a lazy layout around an eager leaf route', async () => {
     const routes = [
-      lazyLayout(
-        '/admin',
-        async () => ParentComponent,
-        [route('/child', ChildComponent)],
-      ),
+      lazyLayout('/admin', async () => ParentComponent, [
+        route('/child', ChildComponent),
+      ]),
     ] as const satisfies StreamixRoutes;
 
     bootstrap(routes);
@@ -187,11 +184,9 @@ describe('StreamixRouter: flat routes and layouts', () => {
 
   it('renders a lazy layout around a lazy leaf route', async () => {
     const routes = [
-      lazyLayout(
-        '/admin',
-        async () => ParentComponent,
-        [lazyRoute('/lazy-child', async () => ChildComponent)],
-      ),
+      lazyLayout('/admin', async () => ParentComponent, [
+        lazyRoute('/lazy-child', async () => ChildComponent),
+      ]),
     ] as const satisfies StreamixRoutes;
 
     bootstrap(routes);
@@ -257,27 +252,49 @@ describe('StreamixRouter: flat routes and layouts', () => {
     await navigate('/');
     const content = getOutletContent();
     expect(content).toContain('<h1>Home</h1>');
-    // After navigating to '/', both the primary and sidebar outlets should render.
     expect(sidebarOutlet.innerHTML).toContain('<h3>Settings</h3>');
 
     router.disconnect('sidebar', sidebarOutlet);
   });
 
-  it('connects named outlets declared inside a routed layout automatically', async () => {
+  it('connects named outlets declared inside a layout component', async () => {
     const routes = [
       layout('/app', ShellWithSidebarComponent, [
-        route('/workspace', ChildComponent),
-        route('/workspace', SettingsComponent, { outlet: 'sidebar' }),
+        route('/child', ChildComponent),
+        route('/child', SettingsComponent, { outlet: 'sidebar' }),
       ]),
     ] as const satisfies StreamixRoutes;
 
     bootstrap(routes);
-    await navigate('/app/workspace');
+    await navigate('/app/child');
 
     const content = getOutletContent();
     expect(content).toContain('<h2>Shell</h2>');
     expect(content).toContain('<h3>Child</h3>');
     expect(content).toContain('<h3>Settings</h3>');
-    expect(router.state.path).toBe('/app/workspace');
+  });
+
+  it('keeps named outlet navigation working across layout re-renders', async () => {
+    const routes = [
+      layout('/app', ShellWithSidebarComponent, [
+        route('/child', ChildComponent),
+        route('/child', SettingsComponent, { outlet: 'sidebar' }),
+        route('/settings', SettingsComponent),
+        route('/settings', HomeComponent, { outlet: 'sidebar' }),
+      ]),
+    ] as const satisfies StreamixRoutes;
+
+    bootstrap(routes);
+
+    await navigate('/app/child');
+    expect(getOutletContent()).toContain('<h3>Child</h3>');
+    expect(getOutletContent()).toContain('<h3>Settings</h3>');
+
+    await navigate('/app/settings');
+
+    const content = getOutletContent();
+    expect(content).toContain('<h3>Settings</h3>');
+    expect(content).toContain('<h1>Home</h1>');
+    expect(router.state.path).toBe('/app/settings');
   });
 });

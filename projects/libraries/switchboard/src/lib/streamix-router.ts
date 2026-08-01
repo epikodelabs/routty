@@ -32,6 +32,7 @@ import {
 } from './route-compiler';
 
 import {
+  composeAngularLeafRouteView,
   composeAngularRouteView,
   type ResolvedRouteView,
 } from './route-renderer';
@@ -422,6 +423,11 @@ function adaptRoute(
   appRef: ApplicationRef,
   injector: EnvironmentInjector,
 ): Route {
+  const tokens = {
+    routeToken: STREAMIX_ROUTE,
+    contextToken: STREAMIX_ROUTE_CONTEXT,
+  } as const;
+
   return {
     name: route.name,
     path,
@@ -439,15 +445,20 @@ function adaptRoute(
       const views = await resolveViews(layouts, route);
 
       return {
-        component: composeAngularRouteView(
-          appRef,
-          injector,
-          {
-            routeToken: STREAMIX_ROUTE,
-            contextToken: STREAMIX_ROUTE_CONTEXT,
-          },
-          views,
-        ),
+        component:
+          route.outlet
+            ? composeAngularLeafRouteView(
+                appRef,
+                injector,
+                tokens,
+                views,
+              )
+            : composeAngularRouteView(
+                appRef,
+                injector,
+                tokens,
+                views,
+              ),
         canActivate: adaptBeforeEnter(route.beforeEnter, injector),
         canDeactivate: adaptBeforeLeave(route.beforeLeave, injector),
         resolve: adaptLoaders(route, injector),
@@ -574,7 +585,7 @@ export class StreamixRouter<
   private readonly registry: ReturnType<typeof createRouteRegistry>;
   private engine: Router | null = null;
   private currentState: RouterState = EMPTY_ROUTER_STATE;
-  private readonly outlets = new Map<string, HTMLElement>();
+  private readonly outlets = new Map<string, HTMLElement[]>();
 
   public readonly navigateTo: TypedNavigate<TRoutes>;
   public readonly hrefTo: TypedHref<TRoutes>;
@@ -631,24 +642,22 @@ export class StreamixRouter<
     const outletName =
       name.trim();
 
-    const existing =
+    const registered =
       this.outlets.get(
         outletName,
-      );
+      ) ?? [];
 
-    if (existing === outlet) {
+    if (registered.includes(outlet)) {
       return;
     }
 
-    if (existing) {
-      throw new Error(
-        `StreamixRouter outlet "${outletName}" is already connected.`,
-      );
-    }
+    registered.push(
+      outlet,
+    );
 
     this.outlets.set(
       outletName,
-      outlet,
+      registered,
     );
 
     if (this.engine) {
@@ -696,7 +705,7 @@ export class StreamixRouter<
           node,
         ) => {
           const target =
-            this.outlets.get(
+            this.getOutlet(
               targetName,
             );
 
@@ -721,7 +730,12 @@ export class StreamixRouter<
 
         // Second phase: perform synchronous DOM mutations.
         for (const outlet of outlets) {
-          const target = this.outlets.get(outlet.name)!;
+          const target = this.getOutlet(outlet.name);
+
+          if (!target) {
+            throw new Error(`Router outlet "${outlet.name}" is not connected.`);
+          }
+
           target.replaceChildren(outlet.node);
           dispatchOutletLifecycleEvent(
             target,
@@ -737,7 +751,7 @@ export class StreamixRouter<
           _router,
         ) => {
           const target =
-            this.outlets.get(
+            this.getOutlet(
               targetName,
             );
 
@@ -764,7 +778,7 @@ export class StreamixRouter<
           _router,
         ) => {
           const target =
-            this.outlets.get(
+            this.getOutlet(
               targetName,
             );
 
@@ -831,17 +845,34 @@ export class StreamixRouter<
     const outletName =
       name.trim();
 
-    if (
+    const registered =
       this.outlets.get(
         outletName,
-      ) !== outlet
-    ) {
+      );
+
+    if (!registered) {
       return;
     }
 
-    this.outlets.delete(
-      outletName,
+    const index =
+      registered.lastIndexOf(
+        outlet,
+      );
+
+    if (index < 0) {
+      return;
+    }
+
+    registered.splice(
+      index,
+      1,
     );
+
+    if (registered.length === 0) {
+      this.outlets.delete(
+        outletName,
+      );
+    }
 
     if (
       this.outlets.size === 0
@@ -1075,6 +1106,19 @@ export class StreamixRouter<
         },
       },
     ) as TypedHref<TRoutes>;
+  }
+
+  private getOutlet(
+    name: string,
+  ): HTMLElement | null {
+    const registered =
+      this.outlets.get(
+        name.trim(),
+      );
+
+    return registered?.[
+      registered.length - 1
+    ] ?? null;
   }
 }
 

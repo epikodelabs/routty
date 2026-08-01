@@ -375,3 +375,121 @@ export function composeAngularRouteView(
     }
   };
 }
+
+export function composeAngularLeafRouteView(
+  appRef: ApplicationRef,
+  rootInjector:
+    EnvironmentInjector,
+  tokens: RouteRenderTokens,
+  views:
+    readonly ResolvedRouteView[],
+): RouteComponent {
+  return async (
+    route,
+    context,
+  ) => {
+    const scopedInjectors:
+      EnvironmentInjector[] = [];
+
+    let parentInjector =
+      rootInjector;
+
+    try {
+      for (const view of views) {
+        const scopedInjector =
+          createScopedInjector(
+            view.providers,
+            parentInjector,
+            view.label,
+          );
+
+        if (scopedInjector) {
+          scopedInjectors.push(
+            scopedInjector,
+          );
+          parentInjector =
+            scopedInjector;
+        }
+      }
+
+      const leaf =
+        views[
+          views.length - 1
+        ];
+
+      if (!leaf) {
+        throw new Error(
+          'A route view requires at least one component.',
+        );
+      }
+
+      const rendered =
+        createAngularComponent(
+          appRef,
+          tokens,
+          leaf.component,
+          parentInjector,
+          route,
+          context,
+        );
+
+      return {
+        node:
+          rendered.node,
+        component:
+          rendered.component,
+
+        dispose(): void {
+          const errors: unknown[] = [];
+
+          try {
+            rendered.dispose?.();
+          } catch (error) {
+            errors.push(error);
+          }
+
+          for (
+            let index =
+              scopedInjectors.length - 1;
+            index >= 0;
+            index--
+          ) {
+            try {
+              scopedInjectors[
+                index
+              ].destroy();
+            } catch (error) {
+              errors.push(error);
+            }
+          }
+
+          if (errors.length === 1) {
+            throw errors[0];
+          }
+
+          if (errors.length > 1) {
+            throw new AggregateError(
+              errors,
+              'Multiple errors occurred while disposing a route view.',
+            );
+          }
+        },
+      };
+    } catch (error) {
+      for (
+        let index =
+          scopedInjectors.length - 1;
+        index >= 0;
+        index--
+      ) {
+        try {
+          scopedInjectors[
+            index
+          ].destroy();
+        } catch {}
+      }
+
+      throw error;
+    }
+  };
+}
