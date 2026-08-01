@@ -3,6 +3,7 @@ import { dispatchRouterLocationChange } from './router-events';
 import {
   isPathInsideBase,
   normalizeBaseHref,
+  getRouterLocation,
   resolveRouterUrl,
   routerHref,
   stripBaseHref
@@ -74,9 +75,13 @@ export type CanDeactivateFn = (
   route: DeactivationContext,
 ) => MaybePromise<GuardResult>;
 
-export type Resolve<T = unknown> =
-  | ((route: NavigationContext) => MaybePromise<T>)
-  | { resolve(route: NavigationContext): MaybePromise<T> };
+export type PrepareRouteDataResult =
+  | void
+  | RouteData;
+
+export type PrepareRouteDataFn = (
+  route: NavigationContext,
+) => MaybePromise<PrepareRouteDataResult>;
 
 export type RouteComponent = (
   route: ActivatedRoute,
@@ -98,7 +103,7 @@ export interface LoadedRoute {
   readonly component?: RouteComponent;
   readonly canActivate?: CanActivateFn[];
   readonly canDeactivate?: CanDeactivateFn[];
-  readonly resolve?: Record<string, Resolve>;
+  readonly prepare?: readonly PrepareRouteDataFn[];
   readonly parseParams?: ParseRouteParams;
   readonly parseQuery?: ParseRouteQuery;
 }
@@ -107,6 +112,7 @@ export interface Route {
   name?: string;
   path: string;
   outlet?: string;
+  sourceRoute?: unknown;
   /** Same-path named outlets activated atomically with this primary route. */
   outlets?: readonly Route[];
   load?: () => MaybePromise<LoadedRoute>;
@@ -116,7 +122,30 @@ export interface Route {
   viewTransition?: boolean;
   canActivate?: CanActivateFn[];
   canDeactivate?: CanDeactivateFn[];
-  resolve?: Record<string, Resolve>;
+  prepare?: readonly PrepareRouteDataFn[];
+}
+
+export interface NavigationTransition {
+  readonly from: ActivatedRoute | null;
+  readonly to: ActivatedRoute;
+  readonly signal: AbortSignal;
+}
+
+export type NavigationTransitionFn = (
+  transition: NavigationTransition,
+) => MaybePromise<GuardResult | void>;
+
+export interface NavigationTransitionDefinition {
+  readonly from?: (
+    route: ActivatedRoute | null,
+  ) => boolean;
+  readonly to?: (
+    route: ActivatedRoute,
+  ) => boolean;
+  readonly beforeEnter?: readonly NavigationTransitionFn[];
+  readonly prepare?: readonly NavigationTransitionFn[];
+  readonly beforeLeave?: readonly NavigationTransitionFn[];
+  readonly afterEnter?: readonly NavigationTransitionFn[];
 }
 
 export type NavigationPhase = 'recognizing' | 'guarding' | 'resolving' | 'loading' | null;
@@ -173,6 +202,7 @@ export interface Router {
 
 export interface RouterConfig {
   routes: Route[];
+  transitions?: readonly NavigationTransitionDefinition[];
   /**
    * Default DOM outlet used when no custom named-outlet renderer is supplied.
    */
@@ -347,8 +377,53 @@ function executeDeactivationGuard(
   return guard(route);
 }
 
-function executeResolver(resolver: Resolve, route: NavigationContext): MaybePromise<unknown> {
-  return typeof resolver === 'function' ? resolver(route) : resolver.resolve(route);
+function executePrepareRouteData(
+  prepare: PrepareRouteDataFn,
+  route: NavigationContext,
+): MaybePromise<PrepareRouteDataResult> {
+  return prepare(route);
+}
+
+function normalizePreparedRouteData(
+  value: PrepareRouteDataResult,
+): RouteData {
+  if (value === undefined) {
+    return EMPTY_DATA;
+  }
+
+  if (
+    typeof value !== 'object'
+    || value === null
+    || Array.isArray(value)
+  ) {
+    throw new Error(
+      'Route prepare handlers must return an object or void.',
+    );
+  }
+
+  return Object.freeze({ ...value });
+}
+
+function mergeRouteData(
+  entries: readonly RouteData[],
+): RouteData {
+  if (entries.length === 0) {
+    return EMPTY_DATA;
+  }
+
+  return Object.freeze(
+    Object.assign(
+      {},
+      ...entries,
+    ),
+  );
+}
+
+function executeTransition(
+  transition: NavigationTransitionFn,
+  context: NavigationTransition,
+): MaybePromise<GuardResult | void> {
+  return transition(context);
 }
 
 function throwIfAborted(signal: AbortSignal): void {
@@ -466,7 +541,7 @@ function loadRoute(
         component: loaded.component,
         canActivate: loaded.canActivate,
         canDeactivate: loaded.canDeactivate,
-        resolve: loaded.resolve,
+        prepare: loaded.prepare ?? route.prepare,
         parseParams: loaded.parseParams,
         parseQuery: loaded.parseQuery,
       }))
@@ -487,14 +562,21 @@ export function createRouter(config: RouterConfig): Router {
   const renderNotFound = config.renderNotFound;
   const renderError = config.renderError;
   const commitOutlets = config.commit;
-  const navigateExternal = config.navigateExternal ?? ((url: URL) => window.location.assign(url.href));
+  const transitions = config.transitions ?? [];
+  const browserWindow = typeof window === 'undefined' ? null : window;
+  const browserDocument = typeof document === 'undefined' ? null : document;
+  const routerLocation = () =>
+    browserWindow?.location ?? getRouterLocation(browserDocument);
+  const navigateExternal = config.navigateExternal ?? ((url: URL) => {
+    browserWindow?.location.assign(url.href);
+  });
   const baseHref = normalizeBaseHref(config.baseHref ?? '/');
   const maxRedirects = config.maxRedirects ?? 10;
   const scrollRestoration = config.scrollRestoration ?? 'preserve';
   const preloading = config.preloading ?? 'none';
   const viewTransitions = config.viewTransitions ?? false;
   const history =
-    new HistoryManager();
+    new HistoryManager(browserWindow, routerLocation());
   const routePatterns = new WeakMap<Route, RoutePattern>();
 
   let currentState: ActiveRoute | null = null;
@@ -524,7 +606,83 @@ export function createRouter(config: RouterConfig): Router {
   }
 
   function resolveOutlet(): HTMLElement | null {
-    return config.outlet ?? document.getElementById('app');
+    return config.outlet ?? browserDocument?.getElementById('app') ?? null;
+  }
+
+  function matchesTransitionDefinition(
+    definition: NavigationTransitionDefinition,
+    from: ActivatedRoute | null,
+    to: ActivatedRoute,
+  ): boolean {
+    return (definition.from?.(from) ?? true)
+      && (definition.to?.(to) ?? true);
+  }
+
+  function collectTransitionPhase(
+    phase: keyof Pick<
+      NavigationTransitionDefinition,
+      'beforeEnter' | 'prepare' | 'beforeLeave' | 'afterEnter'
+    >,
+    from: ActivatedRoute | null,
+    to: ActivatedRoute,
+  ): readonly NavigationTransitionFn[] {
+    const handlers: NavigationTransitionFn[] = [];
+
+    for (const definition of transitions) {
+      if (!matchesTransitionDefinition(definition, from, to)) {
+        continue;
+      }
+
+      handlers.push(...(definition[phase] ?? []));
+    }
+
+    return handlers;
+  }
+
+  async function runTransitionPhase(
+    phase: keyof Pick<
+      NavigationTransitionDefinition,
+      'beforeEnter' | 'prepare' | 'beforeLeave'
+    >,
+    from: ActivatedRoute | null,
+    to: ActivatedRoute,
+    signal: AbortSignal,
+  ): Promise<GuardResult> {
+    const handlers = collectTransitionPhase(phase, from, to);
+
+    for (const handler of handlers) {
+      const result = await executeTransition(handler, {
+        from,
+        to,
+        signal,
+      });
+      throwIfAborted(signal);
+
+      if (result === undefined || result === true) {
+        continue;
+      }
+
+      return result;
+    }
+
+    return true;
+  }
+
+  function runAfterEnterTransitions(
+    from: ActivatedRoute | null,
+    to: ActivatedRoute,
+  ): void {
+    const handlers = collectTransitionPhase('afterEnter', from, to);
+
+    for (const handler of handlers) {
+      void Promise.resolve(
+        executeTransition(handler, {
+          from,
+          to,
+          signal: new AbortController().signal,
+        }),
+      ).catch(error => trace('afterEnter transition failed', error));
+    }
   }
 
   function createStatusRoute(url: URL): ActivatedRoute {
@@ -534,7 +692,7 @@ export function createRouter(config: RouterConfig): Router {
       params: EMPTY_PARAMS,
       query: readRawQuery(url),
       data: EMPTY_DATA,
-      historyState: window.history.state,
+      historyState: browserWindow?.history.state ?? null,
       config: config.routes[0] ?? { path: '**' },
     };
   }
@@ -593,18 +751,19 @@ export function createRouter(config: RouterConfig): Router {
   }
 
   function currentHref(): string {
-    return window.location.pathname + window.location.search + window.location.hash;
+    const location = routerLocation();
+    return location.pathname + location.search + location.hash;
   }
 
   function readScroll(): ScrollPosition {
     return {
-      x: window.scrollX,
-      y: window.scrollY,
+      x: browserWindow?.scrollX ?? 0,
+      y: browserWindow?.scrollY ?? 0,
     }
   }
 
   function scrollToPosition(position: ScrollPosition): void {
-    window.scrollTo(position.x, position.y);
+    browserWindow?.scrollTo(position.x, position.y);
   }
 
   function restoreScroll(update: HistoryUpdate): void {
@@ -633,7 +792,7 @@ export function createRouter(config: RouterConfig): Router {
   }
 
   function resolveAppUrl(target: string | URL, mode: 'navigate' | 'href'): URL {
-    return resolveRouterUrl(target, baseHref, window.location, mode);
+    return resolveRouterUrl(target, baseHref, routerLocation(), mode);
   }
 
   function activeHref(): string | null {
@@ -647,12 +806,12 @@ export function createRouter(config: RouterConfig): Router {
     const href =
       active ?? fallback;
 
-    window.history.replaceState(
-      currentState?.historyState ??
-        history.createDefaultUpdate().previousEntry?.state ?? null,
-      '',
-      href,
-    );
+    browserWindow?.history.replaceState(
+        currentState?.historyState ??
+          history.createDefaultUpdate().previousEntry?.state ?? null,
+        '',
+        href,
+      );
 
     dispatchRouterLocationChange();
   }
@@ -680,11 +839,11 @@ export function createRouter(config: RouterConfig): Router {
       state: state ?? null,
     };
 
-    window.history.replaceState(
-      nextEntry.state,
-      '',
-      nextEntry.href,
-    );
+    browserWindow?.history.replaceState(
+        nextEntry.state,
+        '',
+        nextEntry.href,
+      );
     history.commitUpdate({ ...history.createDefaultUpdate(), nextEntry }, nextEntry.href);
     dispatchRouterLocationChange();
 
@@ -697,12 +856,6 @@ export function createRouter(config: RouterConfig): Router {
   function shouldUseViewTransition(
     context: ViewTransitionContext,
   ): boolean {
-    if (
-      (context.routeConfig?.outlets?.length ?? 0) > 0
-    ) {
-      return false;
-    }
-
     const routeOverride = context.routeConfig?.viewTransition;
     if (routeOverride !== undefined) return routeOverride;
 
@@ -720,7 +873,12 @@ export function createRouter(config: RouterConfig): Router {
       return;
     }
 
-    const transitionDocument = document as Document & {
+    if (!browserDocument) {
+      action();
+      return;
+    }
+
+    const transitionDocument = browserDocument as Document & {
       startViewTransition?: (
         callback: () => void | PromiseLike<void>,
       ) => { finished: PromiseLike<unknown> };
@@ -951,16 +1109,16 @@ export function createRouter(config: RouterConfig): Router {
 
   function cancelScheduledPreloading(): void {
     if (preloadIdleId !== null) {
-      const cancelIdle = (window as Window & {
+      const cancelIdle = (browserWindow as (Window & {
         cancelIdleCallback?: (id: number) => void;
-      }).cancelIdleCallback;
+      }) | null)?.cancelIdleCallback;
 
       cancelIdle?.(preloadIdleId);
       preloadIdleId = null;
     }
 
     if (preloadTimeoutId !== null) {
-      window.clearTimeout(preloadTimeoutId);
+      browserWindow?.clearTimeout(preloadTimeoutId);
       preloadTimeoutId = null;
     }
 
@@ -996,16 +1154,16 @@ export function createRouter(config: RouterConfig): Router {
       return;
     }
 
-    const requestIdle = (window as Window & {
+    const requestIdle = (browserWindow as (Window & {
       requestIdleCallback?: (callback: () => void) => number;
-    }).requestIdleCallback;
+    }) | null)?.requestIdleCallback;
 
     if (typeof requestIdle === 'function') {
       preloadIdleId = requestIdle(run);
       return;
     }
 
-    preloadTimeoutId = window.setTimeout(run, 0);
+    preloadTimeoutId = browserWindow?.setTimeout(run, 0) ?? null;
   }
 
   async function runCanDeactivateGuards(
@@ -1093,20 +1251,20 @@ export function createRouter(config: RouterConfig): Router {
     const match = recognize(path);
     throwIfAborted(signal);
 
-    setPhase(request, 'guarding');
-    const deactivationResult = await runCanDeactivateGuards(request.url, signal);
-    if (deactivationResult === false) {
-      return { type: 'blocked', request };
-    }
-
-    const deactivationRedirect = deactivationResult
-      ? readRedirect(deactivationResult)
-      : null;
-    if (deactivationRedirect) {
-      return { type: 'redirect', request, ...deactivationRedirect };
-    }
-
     if (!match) {
+      setPhase(request, 'guarding');
+      const deactivationResult = await runCanDeactivateGuards(request.url, signal);
+      if (deactivationResult === false) {
+        return { type: 'blocked', request };
+      }
+
+      const deactivationRedirect = deactivationResult
+        ? readRedirect(deactivationResult)
+        : null;
+      if (deactivationRedirect) {
+        return { type: 'redirect', request, ...deactivationRedirect };
+      }
+
       return { type: 'not-found', request };
     }
 
@@ -1170,6 +1328,50 @@ export function createRouter(config: RouterConfig): Router {
       config: route,
     }));
 
+    setPhase(request, 'guarding');
+
+    const beforeLeaveResult = await runTransitionPhase(
+      'beforeLeave',
+      currentState,
+      baseRoutes[0],
+      signal,
+    );
+    if (beforeLeaveResult === false) {
+      return { type: 'blocked', request };
+    }
+
+    const beforeLeaveRedirect = readRedirect(beforeLeaveResult);
+    if (beforeLeaveRedirect) {
+      return { type: 'redirect', request, ...beforeLeaveRedirect };
+    }
+
+    const deactivationResult = await runCanDeactivateGuards(request.url, signal);
+    if (deactivationResult === false) {
+      return { type: 'blocked', request };
+    }
+
+    const deactivationRedirect = deactivationResult
+      ? readRedirect(deactivationResult)
+      : null;
+    if (deactivationRedirect) {
+      return { type: 'redirect', request, ...deactivationRedirect };
+    }
+
+    const beforeEnterResult = await runTransitionPhase(
+      'beforeEnter',
+      currentState,
+      baseRoutes[0],
+      signal,
+    );
+    if (beforeEnterResult === false) {
+      return { type: 'blocked', request };
+    }
+
+    const beforeEnterRedirect = readRedirect(beforeEnterResult);
+    if (beforeEnterRedirect) {
+      return { type: 'redirect', request, ...beforeEnterRedirect };
+    }
+
     for (let index = 0; index < loadedRoutes.length; index++) {
       const context: NavigationContext = {
         ...baseRoutes[index],
@@ -1189,26 +1391,75 @@ export function createRouter(config: RouterConfig): Router {
       }
     }
 
+    const prepareResult = await runTransitionPhase(
+      'prepare',
+      currentState,
+      baseRoutes[0],
+      signal,
+    );
+    if (prepareResult === false) {
+      return { type: 'blocked', request };
+    }
+
+    const prepareRedirect = readRedirect(prepareResult);
+    if (prepareRedirect) {
+      return { type: 'redirect', request, ...prepareRedirect };
+    }
+
     setPhase(request, 'resolving');
+    const preparedRouteData =
+      new WeakMap<
+        PrepareRouteDataFn,
+        Promise<RouteData>
+      >();
 
     const activatedRoutes = await Promise.all(
       baseRoutes.map(async (baseRoute, index): Promise<ActiveRoute> => {
-        const entries = await Promise.all(
-          Object.entries(loadedRoutes[index].resolve ?? {}).map(
-            async ([key, resolver]) => [
-              key,
-              await executeResolver(resolver, { ...baseRoute, signal }),
-            ] as const,
+        const context: NavigationContext = {
+          ...baseRoute,
+          signal,
+        };
+
+        const preparedData = mergeRouteData(
+          await Promise.all(
+            (loadedRoutes[index].prepare ?? []).map(
+              prepare => {
+                let pending =
+                  preparedRouteData.get(
+                    prepare,
+                  );
+
+                if (!pending) {
+                  pending = Promise.resolve(
+                    executePrepareRouteData(
+                      prepare,
+                      context,
+                    ),
+                  ).then(result =>
+                    normalizePreparedRouteData(
+                      result,
+                    ),
+                  );
+
+                  preparedRouteData.set(
+                    prepare,
+                    pending,
+                  );
+                }
+
+                return pending;
+              },
+            ),
           ),
         );
         throwIfAborted(signal);
 
         return {
           ...baseRoute,
-          data: Object.freeze({
-            ...baseRoute.data,
-            ...Object.fromEntries(entries),
-          }),
+          data: mergeRouteData([
+            baseRoute.data,
+            preparedData,
+          ]),
         };
       }),
     );
@@ -1326,7 +1577,7 @@ export function createRouter(config: RouterConfig): Router {
 
         if (
           redirectUrl.origin !==
-          window.location.origin
+          routerLocation().origin
         ) {
           requestState = null;
           navigationPhase = null;
@@ -1348,7 +1599,7 @@ export function createRouter(config: RouterConfig): Router {
           redirectUrl.hash;
 
         const historyState =
-          window.history.state;
+          browserWindow?.history.state ?? null;
 
         const historyUpdate =
           history.createUpdate(
@@ -1357,15 +1608,15 @@ export function createRouter(config: RouterConfig): Router {
             historyState,
           );
 
-        window.history[
-          redirect.replace
-            ? 'replaceState'
-            : 'pushState'
-        ](
-          historyState,
-          '',
-          href,
-        );
+        browserWindow?.history[
+            redirect.replace
+              ? 'replaceState'
+              : 'pushState'
+          ](
+            historyState,
+            '',
+            href,
+          );
 
         dispatchRouterLocationChange();
 
@@ -1437,6 +1688,7 @@ export function createRouter(config: RouterConfig): Router {
 
     switch (result.type) {
       case 'success': {
+        const previousRoute = currentState;
         runWithViewTransition({
           url: result.request.url,
           from: currentState,
@@ -1516,11 +1768,12 @@ export function createRouter(config: RouterConfig): Router {
         requestState = null;
         navigationPhase = null;
         errorState = null;
-        window.dispatchEvent(new CustomEvent('routechange', { detail: result.route }));
+        browserWindow?.dispatchEvent(new CustomEvent('routechange', { detail: result.route }));
         trace('Navigation completed', result.route.path);
         restoreScroll(result.request.historyUpdate);
         settleRequest(result.request, true);
         notifyStateChange();
+        runAfterEnterTransitions(previousRoute, result.route);
         return;
       }
       case 'redirect': {
@@ -1536,7 +1789,7 @@ export function createRouter(config: RouterConfig): Router {
         const url = resolveAppUrl(result.redirectTo, 'href');
         if (
           url.origin !==
-          window.location.origin
+          routerLocation().origin
         ) {
           void requestExternalNavigation(
             url,
@@ -1547,9 +1800,9 @@ export function createRouter(config: RouterConfig): Router {
         }
 
         const href = url.pathname + url.search + url.hash;
-        const historyState = window.history.state;
+        const historyState = browserWindow?.history.state ?? null;
         const historyUpdate = history.createUpdate(href, result.replace, historyState);
-        window.history[result.replace ? 'replaceState' : 'pushState'](historyState, '', href);
+        browserWindow?.history[result.replace ? 'replaceState' : 'pushState'](historyState, '', href);
         dispatchRouterLocationChange();
         void requestNavigation(
           url,
@@ -1582,7 +1835,8 @@ export function createRouter(config: RouterConfig): Router {
           if (renderNotFound) {
             renderNotFound('', result.request.url, publicRouter);
           } else {
-            const heading = document.createElement('h1');
+            const heading = browserDocument?.createElement('h1');
+            if (!heading) return;
             heading.textContent = '404 — Page Not Found';
             renderPrimaryNode(
               heading,
@@ -1621,7 +1875,8 @@ export function createRouter(config: RouterConfig): Router {
             if (renderError) {
               renderError('', result.error, publicRouter);
             } else {
-              const heading = document.createElement('h1');
+              const heading = browserDocument?.createElement('h1');
+              if (!heading) return;
               heading.textContent = 'Page failed to load';
               renderPrimaryNode(
                 heading,
@@ -1651,7 +1906,7 @@ export function createRouter(config: RouterConfig): Router {
 
   function handlePopState(): void {
     requestNavigation(
-      new URL(window.location.href),
+      new URL(routerLocation().href),
       0,
       undefined,
       history.createPopStateUpdate(currentHref()),
@@ -1672,12 +1927,13 @@ export function createRouter(config: RouterConfig): Router {
     if (anchor.target && anchor.target !== '_self') return;
     if (anchor.hasAttribute('download') || anchor.rel.split(/\s+/).includes('external')) return;
 
-    const url = new URL(anchor.href, window.location.href);
-    if (url.origin !== window.location.origin || !isInsideBase(url.pathname)) {
+    const location = routerLocation();
+    const url = new URL(anchor.href, location.href);
+    if (url.origin !== location.origin || !isInsideBase(url.pathname)) {
       return;
     }
 
-    if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) {
+    if (url.pathname === location.pathname && url.search === location.search && url.hash) {
       return;
     }
 
@@ -1691,7 +1947,7 @@ export function createRouter(config: RouterConfig): Router {
 
     if (
       url.origin !==
-      window.location.origin
+      routerLocation().origin
     ) {
       return requestExternalNavigation(
         url,
@@ -1711,7 +1967,7 @@ export function createRouter(config: RouterConfig): Router {
     const href = url.pathname + url.search + url.hash;
     const historyState = options.state ?? null;
     const historyUpdate = history.createUpdate(href, options.replace ?? false, historyState);
-    window.history[options.replace ? 'replaceState' : 'pushState'](historyState, '', href);
+    browserWindow?.history[options.replace ? 'replaceState' : 'pushState'](historyState, '', href);
     dispatchRouterLocationChange();
     return requestNavigation(url, 0, undefined, historyUpdate);
   }
@@ -1732,14 +1988,14 @@ export function createRouter(config: RouterConfig): Router {
     }
 
     started = true;
-    window.addEventListener(
-      'popstate',
-      handlePopState,
-    );
-    document.addEventListener(
-      'click',
-      handleClick,
-    );
+    browserWindow?.addEventListener(
+        'popstate',
+        handlePopState,
+      );
+    browserDocument?.addEventListener(
+        'click',
+        handleClick,
+      );
     schedulePreloading();
 
     // Starting the router must be synchronous from the caller's point of
@@ -1764,7 +2020,7 @@ export function createRouter(config: RouterConfig): Router {
       }
 
       void requestNavigation(
-        new URL(window.location.href),
+        new URL(routerLocation().href),
         0,
         undefined,
         history.createDefaultUpdate(),
@@ -1780,8 +2036,8 @@ export function createRouter(config: RouterConfig): Router {
       return;
     }
 
-    window.removeEventListener('popstate', handlePopState);
-    document.removeEventListener('click', handleClick);
+    browserWindow?.removeEventListener('popstate', handlePopState);
+    browserDocument?.removeEventListener('click', handleClick);
     cancelActiveNavigation();
     disposeAllRenders();
     clearOutlet();
@@ -1800,7 +2056,11 @@ export function createRouter(config: RouterConfig): Router {
   }
 
   function createLink(to: string, text: string, className = ''): HTMLAnchorElement {
-    const link = document.createElement('a');
+    if (!browserDocument) {
+      throw new Error('Cannot create a router link without a document.');
+    }
+
+    const link = browserDocument.createElement('a');
     link.href = href(to);
     link.textContent = text;
     if (className) link.className = className;
@@ -1865,8 +2125,8 @@ export function createRouter(config: RouterConfig): Router {
     replace: (target, state) => replace(target, state),
     updateHistoryState: (state) => updateHistoryState(state),
     preload: () => preload(),
-    back: () => window.history.back(),
-    forward: () => window.history.forward(),
+    back: () => browserWindow?.history.back(),
+    forward: () => browserWindow?.history.forward(),
     href: (target) => href(target),
     createLink: (to, text, className) => createLink(to, text, className),
   };

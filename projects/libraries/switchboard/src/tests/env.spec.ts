@@ -43,3 +43,9 @@ export function iit(name: string, fn: jasmine.ImplementationCallback) {
 // Export environment flags too
 export { isBrowser, isNode };
 
+describe('test environment helpers', () => {
+  it('loads helper wrappers', () => {
+    expect(true).toBeTrue();
+  });
+});
+

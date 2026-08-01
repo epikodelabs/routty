@@ -1,4 +1,4 @@
-import { createRouter, type Route, type Router, type RouterConfig } from 'switchboard';
+import { createRouter, type Route, type Router, type RouterConfig } from '@epikodelabs/switchboard';
 import { idescribe } from './env.spec';
 
 function unwrapTestComponent<T>(value: T | { default: T }): T {
@@ -279,7 +279,7 @@ idescribe('Router', () => {
         });
         it('should ignore an active URL without touching history when configured', async () => {
             let guardCalls = 0;
-            let resolverCalls = 0;
+            let prepareCalls = 0;
             let componentLoads = 0;
             const pushStateSpy = spyOn(window.history, 'pushState').and.callThrough();
             router = createRouter({
@@ -294,12 +294,12 @@ idescribe('Router', () => {
                                     guardCalls++;
                                     return true;
                                 }],
-                            resolve: {
-                                value: () => {
-                                    resolverCalls++;
-                                    return 'resolved';
-                                }
-                            }
+                            prepare: [() => {
+                                prepareCalls++;
+                                return {
+                                    value: 'prepared'
+                                };
+                            }]
                         })
                     }], render: (name, node) => {
                     outlet.replaceChildren(node);
@@ -311,7 +311,7 @@ idescribe('Router', () => {
             const navigated = await router.navigate('/same');
             expect(navigated).toBeFalse();
             expect(guardCalls).toBe(1);
-            expect(resolverCalls).toBe(1);
+            expect(prepareCalls).toBe(1);
             expect(componentLoads).toBe(1);
             expect(pushStateSpy).not.toHaveBeenCalled();
         });
@@ -715,18 +715,18 @@ idescribe('Router', () => {
             expect(router.state.current?.path).toBe('/target');
         });
     });
-    describe('resolvers', () => {
-        it('should resolve data before navigation', async () => {
+    describe('prepare data', () => {
+        it('should prepare data before navigation', async () => {
             const config: RouterConfig = {
                 routes: [
                     {
                         path: 'user',
                         load: async () => ({
                             component: unwrapTestComponent(await (() => Promise.resolve(createComponent('User')))()),
-                            resolve: {
-                                userId: () => 123,
-                                userName: () => 'Alice'
-                            }
+                            prepare: [
+                                () => ({ userId: 123 }),
+                                () => ({ userName: 'Alice' })
+                            ]
                         })
                     },
                 ],
@@ -743,19 +743,17 @@ idescribe('Router', () => {
                 userName: 'Alice'
             });
         });
-        it('should support async resolvers', async () => {
+        it('should support async prepare handlers', async () => {
             const config: RouterConfig = {
                 routes: [
                     {
                         path: 'async-data',
                         load: async () => ({
                             component: unwrapTestComponent(await (() => Promise.resolve(createComponent('Async Data')))()),
-                            resolve: {
-                                data: async () => {
+                            prepare: [async () => {
                                     await delay(10);
-                                    return { id: 1, name: 'Async' };
-                                }
-                            }
+                                    return { data: { id: 1, name: 'Async' } };
+                                }]
                         })
                     },
                 ],
@@ -771,7 +769,7 @@ idescribe('Router', () => {
                 data: { id: 1, name: 'Async' }
             });
         });
-        it('should merge static data and resolved data', async () => {
+        it('should merge static data and prepared data', async () => {
             const config: RouterConfig = {
                 routes: [
                     {
@@ -779,9 +777,7 @@ idescribe('Router', () => {
                         data: { static: 'static-value' },
                         load: async () => ({
                             component: unwrapTestComponent(await (() => Promise.resolve(createComponent('Merged')))()),
-                            resolve: {
-                                dynamic: () => 'dynamic-value'
-                            }
+                            prepare: [() => ({ dynamic: 'dynamic-value' })]
                         })
                     },
                 ],
@@ -798,16 +794,17 @@ idescribe('Router', () => {
                 dynamic: 'dynamic-value'
             });
         });
-        it('should work with resolver objects', async () => {
+        it('should merge multiple prepare handlers', async () => {
             const config: RouterConfig = {
                 routes: [
                     {
                         path: 'user',
                         load: async () => ({
                             component: unwrapTestComponent(await (() => Promise.resolve(createComponent('User')))()),
-                            resolve: {
-                                userId: () => 123
-                            }
+                            prepare: [
+                                () => ({ userId: 100 }),
+                                () => ({ userId: 123 })
+                            ]
                         })
                     },
                 ],
@@ -1526,12 +1523,10 @@ idescribe('Router', () => {
                         path: 'async',
                         load: async () => ({
                             component: unwrapTestComponent(await (() => Promise.resolve(createComponent('Async')))()),
-                            resolve: {
-                                data: async () => {
+                            prepare: [async () => {
                                     await delay(30);
-                                    return 'data';
-                                }
-                            }
+                                    return { data: 'data' };
+                                }]
                         })
                     },
                 ], render: (name, node) => {
@@ -1553,12 +1548,10 @@ idescribe('Router', () => {
                         path: 'async',
                         load: async () => ({
                             component: unwrapTestComponent(await (() => Promise.resolve(createComponent('Async')))()),
-                            resolve: {
-                                data: async () => {
+                            prepare: [async () => {
                                     await delay(30);
-                                    return 'data';
-                                }
-                            }
+                                    return { data: 'data' };
+                                }]
                         })
                     },
                 ], render: (name, node) => {
@@ -1658,12 +1651,10 @@ idescribe('Router', () => {
                         path: 'slow',
                         load: async () => ({
                             component: unwrapTestComponent(await (() => Promise.resolve(createComponent('Slow')))()),
-                            resolve: {
-                                data: async () => {
+                            prepare: [async () => {
                                     await delay(100);
-                                    return 'data';
-                                }
-                            }
+                                    return { data: 'data' };
+                                }]
                         })
                     },
                 ],
@@ -1869,8 +1860,7 @@ idescribe('Router', () => {
                         path: 'slow',
                         load: async () => ({
                             component: unwrapTestComponent(await (() => Promise.resolve(createComponent('Slow')))()),
-                            resolve: {
-                                data: async ({ signal }) => {
+                            prepare: [async ({ signal }) => {
                                     markStarted();
                                     await new Promise<void>((_resolve, reject) => {
                                         signal.addEventListener('abort', () => {
@@ -1879,9 +1869,8 @@ idescribe('Router', () => {
                                             reject(error);
                                         }, { once: true });
                                     });
-                                    return 'slow';
-                                }
-                            }
+                                    return { data: 'slow' };
+                                }]
                         })
                     },
                 ],
@@ -1919,18 +1908,16 @@ idescribe('Router', () => {
             expect(router.state.error).toBeDefined();
             expect((router.state.error as Error).message).toBe('Guard failed');
         });
-        it('should handle resolver errors', async () => {
+        it('should handle prepare errors', async () => {
             const config: RouterConfig = {
                 routes: [
                     {
                         path: 'error',
                         load: async () => ({
                             component: unwrapTestComponent(await (() => Promise.resolve(createComponent('Error')))()),
-                            resolve: {
-                                data: () => {
-                                    throw new Error('Resolver failed');
-                                }
-                            }
+                            prepare: [() => {
+                                throw new Error('Prepare failed');
+                            }]
                         })
                     },
                 ],
@@ -1940,7 +1927,7 @@ idescribe('Router', () => {
             router.navigate('/error');
             await delay(50);
             expect(router.state.error).toBeDefined();
-            expect((router.state.error as Error).message).toBe('Resolver failed');
+            expect((router.state.error as Error).message).toBe('Prepare failed');
         });
     });
     describe('tracing', () => {
@@ -2356,7 +2343,7 @@ idescribe('Router', () => {
             expect((router.state.error as Error).message).toBe('Commit failed');
         });
 
-        it('should skip native view transitions for grouped named outlet commits', async () => {
+        it('should run native view transitions for grouped named outlet commits', async () => {
             const transitionDocument = document as Document & {
                 startViewTransition?: (callback: () => void | PromiseLike<void>) => {
                     finished: Promise<void>;
@@ -2383,7 +2370,7 @@ idescribe('Router', () => {
                 });
 
                 expect(await router.navigate('/project/42')).toBeTrue();
-                expect(startViewTransition).not.toHaveBeenCalled();
+                expect(startViewTransition).toHaveBeenCalled();
             }
             finally {
                 transitionDocument.startViewTransition = original;

@@ -4,7 +4,7 @@ import {
   adaptRouteComponent,
   bindRouteInputs,
   type StreamixRouteProviders,
-} from 'switchboard';
+} from '@epikodelabs/switchboard';
 
 @Component({
   template: '',

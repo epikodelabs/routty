@@ -1,29 +1,39 @@
-import { layout, route, s, type StreamixRoutes, type StreamixRouter } from 'switchboard';
+import {
+  layout,
+  route,
+  s,
+  type StreamixRoutes,
+  type StreamixRouter,
+} from '@epikodelabs/switchboard';
 
 class DashboardLayout {}
 class DashboardPage {}
 class SettingsPage {}
 
+const dashboardRoute = route('/dashboard/:projectId', DashboardPage, {
+  name: 'dashboard',
+  paramsSchema: {
+    projectId: s.number({ min: 1 }),
+  },
+  querySchema: {
+    tab: s.string('overview'),
+    page: s.number({ default: 1, min: 1 }),
+    filters: s.array(),
+    draft: s.optional(s.boolean()),
+  },
+});
+
+const settingsRoute = route('/settings', SettingsPage, {
+  name: 'settings',
+  querySchema: {
+    section: s.string('general'),
+  },
+});
+
 const routes = [
   layout('/app', DashboardLayout, [
-    route('/dashboard/:projectId', DashboardPage, {
-      name: 'dashboard',
-      paramsSchema: {
-        projectId: s.number({ min: 1 }),
-      },
-      querySchema: {
-        tab: s.string('overview'),
-        page: s.number({ default: 1, min: 1 }),
-        filters: s.array(),
-        draft: s.optional(s.boolean()),
-      },
-    }),
-    route('/settings', SettingsPage, {
-      name: 'settings',
-      querySchema: {
-        section: s.string('general'),
-      },
-    }),
+    settingsRoute,
+    dashboardRoute,
   ]),
 ] as const satisfies StreamixRoutes;
 

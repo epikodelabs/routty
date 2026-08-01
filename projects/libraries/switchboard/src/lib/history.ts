@@ -22,22 +22,31 @@ export interface HistoryUpdate {
 export const ZERO_SCROLL: ScrollPosition = Object.freeze({ x: 0, y: 0 });
 
 export class HistoryManager {
+  constructor(
+    private readonly browserWindow: Pick<Window, 'history' | 'scrollX' | 'scrollY'> | null =
+      typeof window === 'undefined' ? null : window,
+    private readonly location: Pick<Location, 'pathname' | 'search' | 'hash'> =
+      typeof window === 'undefined'
+        ? { pathname: '/', search: '', hash: '' }
+        : window.location,
+  ) {}
+
   private entries: HistoryEntry[] = [];
   private index = -1;
 
   private get currentHref(): string {
-    return window.location.pathname + window.location.search + window.location.hash;
+    return this.location.pathname + this.location.search + this.location.hash;
   }
 
   private readScroll(): ScrollPosition {
     return {
-      x: window.scrollX,
-      y: window.scrollY,
+      x: this.browserWindow?.scrollX ?? 0,
+      y: this.browserWindow?.scrollY ?? 0,
     };
   }
 
   private readHistoryState(): unknown {
-    return window.history.state ?? null;
+    return this.browserWindow?.history.state ?? null;
   }
 
   private ensureHistoryEntry(): void {

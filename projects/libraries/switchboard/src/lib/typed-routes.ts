@@ -1,5 +1,6 @@
 import type {
   InferParamType,
+  InferQueryInputType,
   InferQueryType,
   ParamSchemaRecord,
   QuerySchemaRecord,
@@ -42,22 +43,46 @@ export type ExtractRouteNames<TRoutes extends StreamixRoutes> =
 /**
  * Infers route path parameter types from paramsSchema or path template tokens.
  */
-export type InferRouteParams<TRoute> = TRoute extends { paramsSchema: ParamSchemaRecord }
-  ? InferParamType<TRoute['paramsSchema']>
-  : TRoute extends { path: infer P extends string }
-  ? [ExtractPathParams<P>] extends [never]
-    ? Record<string, never>
-    : Record<ExtractPathParams<P>, string | number>
-  : Record<string, unknown>;
+export type InferRouteParams<TRoute> =
+  TRoute extends StreamixRoute<
+    infer TPath extends string,
+    string | undefined,
+    infer TParamsSchema,
+    QuerySchemaRecord | undefined
+  >
+    ? [TParamsSchema] extends [ParamSchemaRecord]
+      ? InferParamType<TParamsSchema>
+      : [ExtractPathParams<TPath>] extends [never]
+        ? Record<string, never>
+        : Record<ExtractPathParams<TPath>, string | number>
+    : Record<string, unknown>;
 
 /**
  * Infers route query parameter types from querySchema or searchSchema.
  */
-export type InferRouteQuery<TRoute> = TRoute extends {
-  querySchema: infer TSchema extends QuerySchemaRecord;
-}
-  ? InferQueryType<TSchema>
-  : Record<string, unknown>;
+export type InferRouteQuery<TRoute> =
+  TRoute extends StreamixRoute<
+    string,
+    string | undefined,
+    ParamSchemaRecord | undefined,
+    infer TQuerySchema
+  >
+    ? [TQuerySchema] extends [QuerySchemaRecord]
+      ? InferQueryType<TQuerySchema>
+      : Record<string, unknown>
+    : Record<string, unknown>;
+
+export type InferRouteQueryInput<TRoute> =
+  TRoute extends StreamixRoute<
+    string,
+    string | undefined,
+    ParamSchemaRecord | undefined,
+    infer TQuerySchema
+  >
+    ? [TQuerySchema] extends [QuerySchemaRecord]
+      ? InferQueryInputType<TQuerySchema>
+      : Record<string, unknown>
+    : Record<string, unknown>;
 
 type HasRequiredParams<TRoute> =
   InferRouteParams<TRoute> extends infer TParams
@@ -79,13 +104,13 @@ export type RouteOptionsByName<
     ? HasRequiredParams<TRoute> extends true
       ? {
           readonly params: InferRouteParams<TRoute>;
-          readonly query?: InferRouteQuery<TRoute>;
+          readonly query?: InferRouteQueryInput<TRoute>;
           readonly state?: unknown;
           readonly replace?: boolean;
         }
       : {
           readonly params?: InferRouteParams<TRoute>;
-          readonly query?: InferRouteQuery<TRoute>;
+          readonly query?: InferRouteQueryInput<TRoute>;
           readonly state?: unknown;
           readonly replace?: boolean;
         }

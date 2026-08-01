@@ -1,5 +1,19 @@
 export type RouterUrlMode = 'navigate' | 'href';
 
+const SERVER_LOCATION = {
+  origin: 'http://localhost',
+  pathname: '/',
+  search: '',
+  hash: '',
+  href: 'http://localhost/',
+} satisfies Pick<Location, 'origin' | 'pathname' | 'search' | 'hash' | 'href'>;
+
+export function getRouterLocation(
+  document: Pick<Document, 'location'> | null | undefined,
+): Pick<Location, 'origin' | 'pathname' | 'search' | 'hash' | 'href'> {
+  return document?.location ?? SERVER_LOCATION;
+}
+
 export function normalizePath(path: string): string {
   const normalized = `/${path}`.replace(/\/+/g, '/');
   return normalized.length > 1 && normalized.endsWith('/')

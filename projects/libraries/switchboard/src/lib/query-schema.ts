@@ -112,6 +112,10 @@ export type InferQueryType<T extends Record<string, QuerySchema>> = {
     : never]?: SchemaValue<T[K]>;
 };
 
+export type InferQueryInputType<T extends Record<string, QuerySchema>> = {
+  [K in keyof T]?: SchemaValue<T[K]>;
+};
+
 export type InferParamType<T extends Record<string, ParamSchema>> = {
   [K in keyof T as T[K] extends OptionalSchema<ScalarSchema>
     ? never

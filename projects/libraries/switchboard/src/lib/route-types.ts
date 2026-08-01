@@ -1,9 +1,11 @@
 import type { EnvironmentProviders, Provider, Type } from '@angular/core';
 import type { ParamSchemaRecord, QuerySchemaRecord } from './query-schema';
 import type {
+  ActivatedRoute,
   CanActivateFn as RouterCanActivateFn,
   CanDeactivateFn as RouterCanDeactivateFn,
   NavigationContext,
+  RouteData,
 } from './vanilla-router';
 
 export type MaybePromise<T> = T | PromiseLike<T>;
@@ -17,11 +19,24 @@ export type RouteRedirect = {
   readonly replace?: boolean;
 };
 
-export type RouteLoader<T = unknown> = (
-  context: NavigationContext,
-) => MaybePromise<T>;
+export type FramePrepareResult =
+  | void
+  | RouteData;
 
-export type RouteLoaders = Readonly<Record<string, RouteLoader>>;
+export type FramePrepareFn = (
+  context: NavigationContext,
+) => MaybePromise<FramePrepareResult>;
+
+export type FrameAfterEnterFn = (
+  route: ActivatedRoute,
+) => MaybePromise<void>;
+
+export interface StreamixFrameHooks {
+  readonly beforeEnter?: readonly RouterCanActivateFn[];
+  readonly beforeLeave?: readonly RouterCanDeactivateFn[];
+  readonly prepare?: readonly FramePrepareFn[];
+  readonly afterEnter?: readonly FrameAfterEnterFn[];
+}
 
 export interface StreamixEagerView {
   readonly component: Type<unknown>;
@@ -36,6 +51,12 @@ export interface StreamixLazyView {
 export type StreamixView =
   | StreamixEagerView
   | StreamixLazyView;
+
+export type StreamixFrame =
+  StreamixView &
+  StreamixFrameHooks & {
+    readonly kind: 'frame';
+  };
 
 export interface StreamixRouteBase<
   TPath extends string = string,
@@ -55,7 +76,6 @@ export interface StreamixRouteBase<
   readonly providers?: StreamixRouteProviders;
   readonly canActivate?: readonly RouterCanActivateFn[];
   readonly canDeactivate?: readonly RouterCanDeactivateFn[];
-  readonly resolve?: RouteLoaders;
 }
 
 export type StreamixRouteOptions<
@@ -97,6 +117,7 @@ export type StreamixRenderableRoute<
     TQuerySchema
   > &
   StreamixView & {
+  readonly frame?: StreamixFrame;
   readonly redirectTo?: undefined;
 };
 
@@ -140,7 +161,9 @@ export type StreamixLayout<
     TPath,
     TEntries
   > &
-  StreamixView;
+  StreamixView & {
+    readonly frame?: StreamixFrame;
+  };
 
 // Any-instantiated route/layout primitives to avoid undefined-widening issues
 export type AnyStreamixRoute = StreamixRoute<any, any, any, any>;
