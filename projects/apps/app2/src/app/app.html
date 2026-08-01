@@ -1,0 +1,32 @@
+<div class="app-frame">
+  <header class="masthead">
+    <a class="brand" [routerLink]="'/'">
+      <span class="brand-mark">W</span>
+      <span>
+        <strong>Switchboard</strong>
+        <small>Route Playground</small>
+      </span>
+    </a>
+
+    <nav class="top-nav" aria-label="Primary navigation">
+      <a [routerLink]="'/'">Overview</a>
+      <a
+        [routerLink]="{
+          name: 'workspace',
+          params: { projectId: session.currentUser().homeProjectId },
+          query: {
+            view: session.currentUser().preferredView,
+            page: 1,
+            filters: session.currentUser().focusFilters
+          }
+        }"
+      >
+        Workspace
+      </a>
+      <a [routerLink]="{ name: 'reports' }">Lazy Reports</a>
+      <a [routerLink]="'/legacy'">Redirect</a>
+    </nav>
+  </header>
+
+  <router-outlet />
+</div>
