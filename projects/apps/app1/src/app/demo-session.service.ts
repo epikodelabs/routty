@@ -1,6 +1,5 @@
 import {
   Injectable,
-  computed,
   signal,
 } from '@angular/core';
 
@@ -67,12 +66,6 @@ const demoUsers = Object.freeze([
 export class DemoSessionService {
   readonly users = demoUsers;
   readonly currentUserId = signal(demoUsers[0].id);
-  readonly currentUser = computed(
-    () =>
-      this.users.find(
-        user => user.id === this.currentUserId(),
-      ) ?? this.users[0],
-  );
   readonly adminAccess = signal(
     demoUsers[0].canAccessAdmin,
   );
@@ -80,6 +73,12 @@ export class DemoSessionService {
     demoUsers[0].prefersDraftGuard,
   );
   readonly workspaceLoads = signal(0);
+
+  currentUser(): DemoUser {
+    return this.users.find(
+      user => user.id === this.currentUserId(),
+    ) ?? this.users[0];
+  }
 
   loginAs(userId: string): void {
     const nextUser = this.users.find(
