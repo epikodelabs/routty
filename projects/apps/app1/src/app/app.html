@@ -1,7 +1,7 @@
 <div class="app-frame">
   <header class="masthead">
     <a class="brand" [routerLink]="'/'">
-      <span class="brand-mark">SB</span>
+      <span class="brand-mark">W</span>
       <span>
         <strong>Switchboard</strong>
         <small>Route Playground</small>
@@ -13,8 +13,12 @@
       <a
         [routerLink]="{
           name: 'workspace',
-          params: { projectId: 101 },
-          query: { view: 'overview', page: 1, filters: ['open', 'recent'] }
+          params: { projectId: session.currentUser().homeProjectId },
+          query: {
+            view: session.currentUser().preferredView,
+            page: 1,
+            filters: session.currentUser().focusFilters
+          }
         }"
       >
         Workspace

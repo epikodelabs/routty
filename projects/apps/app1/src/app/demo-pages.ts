@@ -10,6 +10,7 @@ import {
 } from '@epikodelabs/switchboard';
 
 import {
+  type DemoUser,
   type AdminAudit,
   type WorkspaceSnapshot,
   DemoSessionService,
@@ -165,8 +166,34 @@ const sidebarStyles = `
       <p class="lede">
         This app is meant for real browser checks, not framework smoke tests.
         Use it to validate how Switchboard handles redirects, typed params,
-        query defaults, lazy routes, guards, and grouped named outlets.
+        query defaults, lazy routes, frame hooks, and grouped named outlets.
       </p>
+
+      <section class="hero-session">
+        <p class="session-heading">Signed-in demo user</p>
+        <div class="session-user">
+          <div>
+            <strong>{{ currentUser().name }}</strong>
+            <span>{{ currentUser().role }} · {{ currentUser().email }}</span>
+          </div>
+          <p>
+            Home workspace {{ currentUser().homeProjectId }} ·
+            admin {{ currentUser().canAccessAdmin ? 'enabled' : 'disabled' }}
+          </p>
+        </div>
+        <div class="user-toggle-row">
+          @for (user of users; track user.id) {
+            <button
+              type="button"
+              class="user-toggle"
+              [class.user-toggle--active]="user.id === currentUser().id"
+              (click)="activateUser(user.id)"
+            >
+              {{ user.name }}
+            </button>
+          }
+        </div>
+      </section>
 
       <div class="hero-actions">
         <a class="action-link action-link--solid" [routerLink]="'/legacy'">
@@ -181,8 +208,8 @@ const sidebarStyles = `
         >
           Open settings by route name
         </a>
-        <button type="button" class="action-button" (click)="openWorkspace(204)">
-          Navigate with history state
+        <button type="button" class="action-button" (click)="openWorkspace()">
+          Open current workspace
         </button>
       </div>
 
@@ -210,10 +237,10 @@ const sidebarStyles = `
           </p>
         </article>
         <article class="scenario-card">
-          <strong>Guards and lazy routes</strong>
+          <strong>Frames and lazy routes</strong>
           <p>
-            The admin page redirects until access is enabled, and the reports
-            page is loaded lazily.
+            The admin and editor pages use frame lifecycle hooks, and the
+            reports page is loaded lazily.
           </p>
         </article>
       </div>
@@ -259,6 +286,69 @@ const sidebarStyles = `
       flex-wrap: wrap;
       gap: 0.8rem;
       margin: 1.75rem 0 0;
+    }
+
+    .hero-session {
+      display: grid;
+      gap: 0.85rem;
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: 1.2rem;
+      background: rgb(255 255 255 / 0.62);
+    }
+
+    .session-heading {
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .session-user {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.9rem;
+    }
+
+    .session-user strong,
+    .session-user span {
+      display: block;
+    }
+
+    .session-user span,
+    .session-user p {
+      color: var(--ink-soft);
+    }
+
+    .session-user p {
+      margin: 0;
+    }
+
+    .user-toggle-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+    }
+
+    .user-toggle {
+      min-height: 2.7rem;
+      padding: 0.65rem 0.95rem;
+      border: 1px solid rgb(43 92 230 / 0.18);
+      border-radius: 999px;
+      background: rgb(255 255 255 / 0.85);
+      color: var(--ink-strong);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .user-toggle--active {
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--accent-color), var(--accent-deep));
+      color: #fff;
     }
 
     .action-link,
@@ -319,24 +409,39 @@ const sidebarStyles = `
   `,
 })
 export class IntroPage {
+  private readonly session = inject(DemoSessionService);
   private readonly router = inject(StreamixRouter);
+  protected readonly users = this.session.users;
 
-  protected openWorkspace(projectId: number): void {
+  protected currentUser(): DemoUser {
+    return this.session.currentUser();
+  }
+
+  protected activateUser(userId: string): void {
+    this.session.loginAs(userId);
+  }
+
+  protected openWorkspace(
+    projectId = this.currentUser().homeProjectId,
+  ): void {
+    const activeUser = this.currentUser();
+
     void this.router.navigate(
       {
         name: 'workspace',
         params: { projectId },
         query: {
-          view: 'activity',
-          page: 2,
-          filters: ['recent', 'flagged'],
-          draft: true,
+          view: activeUser.preferredView,
+          page: 1,
+          filters: [...activeUser.focusFilters],
+          draft: activeUser.prefersDraftGuard,
         },
       },
       {
         state: {
           source: 'intro-page',
           projectId,
+          userId: activeUser.id,
         },
       },
     );
@@ -356,8 +461,26 @@ export class IntroPage {
         <p class="eyebrow">Scenario menu</p>
         <h2><code>/app</code> layout shell</h2>
 
+        <div class="control-card">
+          <p class="outlet-label">Session user</p>
+          <strong>{{ currentUser().name }}</strong>
+          <p>{{ currentUser().role }} · {{ currentUser().email }}</p>
+          <div class="session-actions">
+            @for (user of users; track user.id) {
+              <button
+                type="button"
+                class="session-button"
+                [class.session-button--active]="user.id === currentUser().id"
+                (click)="activateUser(user.id)"
+              >
+                {{ user.name }}
+              </button>
+            }
+          </div>
+        </div>
+
         <nav class="scenario-nav" aria-label="Scenario navigation">
-          @for (item of navItems; track item.label) {
+          @for (item of navItems(); track item.label) {
             <a class="nav-card" [routerLink]="item.target">
               <strong>{{ item.label }}</strong>
               <span>{{ item.description }}</span>
@@ -376,9 +499,9 @@ export class IntroPage {
           </label>
           <p>
             @if (session.adminAccess()) {
-              The <code>canActivate</code> guard will allow the admin route.
+              The <code>beforeEnter</code> frame hook will allow the admin route.
             } @else {
-              The <code>canActivate</code> guard redirects to access settings.
+              The <code>beforeEnter</code> frame hook redirects to access settings.
             }
           </p>
         </div>
@@ -394,7 +517,7 @@ export class IntroPage {
           </label>
           <p>
             When enabled, leaving the editor route triggers a native
-            confirmation dialog through <code>canDeactivate</code>.
+            confirmation dialog through the <code>beforeLeave</code> frame hook.
           </p>
         </div>
 
@@ -502,6 +625,30 @@ export class IntroPage {
       line-height: 1.55;
     }
 
+    .session-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 0.9rem;
+    }
+
+    .session-button {
+      min-height: 2.5rem;
+      padding: 0.6rem 0.85rem;
+      border: 1px solid rgb(43 92 230 / 0.18);
+      border-radius: 999px;
+      background: rgb(255 255 255 / 0.84);
+      color: var(--ink-strong);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .session-button--active {
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--accent-color), var(--accent-deep));
+      color: #fff;
+    }
+
     @media (max-width: 960px) {
       .playground-shell {
         grid-template-columns: 1fr;
@@ -511,53 +658,66 @@ export class IntroPage {
 })
 export class DemoShellComponent {
   protected readonly session = inject(DemoSessionService);
+  protected readonly users = this.session.users;
 
-  protected readonly navItems = Object.freeze([
-    {
-      label: 'Workspace',
-      description: 'Typed params, query defaults, grouped sidebar outlet',
-      target: {
-        name: 'workspace',
-        params: { projectId: 101 },
-        query: {
-          view: 'overview',
-          page: 1,
-          filters: ['open', 'recent'],
+  protected currentUser(): DemoUser {
+    return this.session.currentUser();
+  }
+
+  protected navItems() {
+    const activeUser = this.currentUser();
+
+    return [
+      {
+        label: 'Workspace',
+        description: 'Typed params, query defaults, grouped sidebar outlet',
+        target: {
+          name: 'workspace',
+          params: { projectId: activeUser.homeProjectId },
+          query: {
+            view: activeUser.preferredView,
+            page: 1,
+            filters: [...activeUser.focusFilters],
+          },
         },
       },
-    },
-    {
-      label: 'Settings',
-      description: 'Query-only route that also receives guard redirects',
-      target: {
-        name: 'settings',
-        query: { section: 'profile' },
+      {
+        label: 'Settings',
+        description: 'Query-only route that also receives guard redirects',
+        target: {
+          name: 'settings',
+          query: { section: 'profile' },
+        },
       },
-    },
-    {
-      label: 'Editor',
-      description: 'canDeactivate confirmation path with a dirty-state toggle',
-      target: {
-        name: 'editor',
-        params: { draftId: 7 },
-        query: { mode: 'review' },
+      {
+        label: 'Editor',
+        description: 'beforeLeave frame hook with a dirty-state toggle',
+        target: {
+          name: 'editor',
+          params: { draftId: activeUser.favoriteDraftId },
+          query: { mode: 'review' },
+        },
       },
-    },
-    {
-      label: 'Lazy reports',
-      description: 'Lazy component route paired with an eager sidebar outlet',
-      target: {
-        name: 'reports',
+      {
+        label: 'Lazy reports',
+        description: 'Lazy component route paired with an eager sidebar outlet',
+        target: {
+          name: 'reports',
+        },
       },
-    },
-    {
-      label: 'Admin',
-      description: 'Guarded route that redirects until access is enabled',
-      target: {
-        name: 'admin',
+      {
+        label: 'Admin',
+        description: 'Guarded route that redirects until access is enabled',
+        target: {
+          name: 'admin',
+        },
       },
-    },
-  ]);
+    ] as const;
+  }
+
+  protected activateUser(userId: string): void {
+    this.session.loginAs(userId);
+  }
 
   protected setAdminAccess(event: Event): void {
     this.session.setAdminAccess(this.readChecked(event));
@@ -584,7 +744,7 @@ export class DemoShellComponent {
           <h1>Workspace {{ projectId() }}</h1>
         </div>
         <span class="status-pill">
-          Resolver load #{{ snapshot()?.loadOrder ?? 0 }}
+          Prepare load #{{ snapshot()?.loadOrder ?? 0 }}
         </span>
       </header>
 
@@ -595,6 +755,14 @@ export class DemoShellComponent {
             <div>
               <dt>projectId</dt>
               <dd>{{ projectId() }}</dd>
+            </div>
+            <div>
+              <dt>user</dt>
+              <dd>{{ snapshot()?.activeUserName ?? 'unknown' }}</dd>
+            </div>
+            <div>
+              <dt>role</dt>
+              <dd>{{ snapshot()?.activeUserRole ?? 'unknown' }}</dd>
             </div>
             <div>
               <dt>view</dt>
@@ -616,7 +784,7 @@ export class DemoShellComponent {
         </article>
 
         <article class="panel">
-          <h3>Resolver payload</h3>
+          <h3>Prepared payload</h3>
           <p>
             Suggested filters:
             <strong>{{ snapshot()?.suggestedFilters?.join(', ') || 'none' }}</strong>
@@ -626,8 +794,12 @@ export class DemoShellComponent {
             <strong>{{ snapshot()?.canOpenAdmin ? 'yes' : 'no' }}</strong>
           </p>
           <p>
-            Use the shell controls to change future resolver output without
-            rebuilding the app.
+            Recommended draft:
+            <strong>#{{ snapshot()?.recommendedDraftId ?? 0 }}</strong>
+          </p>
+          <p>
+            Switching the signed-in demo user updates workspace defaults,
+            editor drafts, and admin review metadata without rebuilding the app.
           </p>
         </article>
       </div>
@@ -659,6 +831,7 @@ export class DemoShellComponent {
   styles: [pageStyles],
 })
 export class WorkspacePage {
+  private readonly session = inject(DemoSessionService);
   private readonly router = inject(StreamixRouter);
 
   protected readonly params = input<ParamsInput>({});
@@ -685,9 +858,11 @@ export class WorkspacePage {
   }
 
   protected openEditor(): void {
+    const activeUser = this.session.currentUser();
+
     void this.router.navigate({
       name: 'editor',
-      params: { draftId: this.projectId() * 10 },
+      params: { draftId: activeUser.favoriteDraftId },
       query: { mode: 'review' },
     });
   }
@@ -848,7 +1023,7 @@ export class SettingsSidebarComponent {}
     <section class="page">
       <header class="page-header">
         <div>
-          <p class="eyebrow">canDeactivate route</p>
+          <p class="eyebrow">beforeLeave frame hook</p>
           <h1>Draft {{ draftId() }}</h1>
         </div>
         <span class="status-pill">{{ mode() }} mode</span>
@@ -942,7 +1117,7 @@ export class EditorSidebarComponent {}
     <section class="page">
       <header class="page-header">
         <div>
-          <p class="eyebrow">canActivate + resolve</p>
+          <p class="eyebrow">beforeEnter + prepare frame hooks</p>
           <h1>Admin console</h1>
         </div>
         <span class="status-pill">guard passed</span>
@@ -957,8 +1132,9 @@ export class EditorSidebarComponent {}
           </p>
         </article>
         <article class="panel">
-          <h3>Resolver audit</h3>
+          <h3>Prepared audit</h3>
           <p>reviewedBy: <strong>{{ audit()?.reviewedBy }}</strong></p>
+          <p>reviewerRole: <strong>{{ audit()?.reviewerRole }}</strong></p>
           <p>workspaceLoads: <strong>{{ audit()?.workspaceLoads ?? 0 }}</strong></p>
         </article>
       </div>

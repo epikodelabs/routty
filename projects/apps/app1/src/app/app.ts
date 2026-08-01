@@ -1,8 +1,12 @@
-import { Component } from '@angular/core';
+import {
+  Component,
+  inject,
+} from '@angular/core';
 import {
   RouterOutlet,
   StreamixRouterLink,
 } from '@epikodelabs/switchboard';
+import { DemoSessionService } from './demo-session.service';
 
 @Component({
   selector: 'app-root',
@@ -14,4 +18,6 @@ import {
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
-export class App {}
+export class App {
+  readonly session = inject(DemoSessionService);
+}
