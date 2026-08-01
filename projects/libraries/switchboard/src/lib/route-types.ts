@@ -23,16 +23,21 @@ export type RouteLoader<T = unknown> = (
 
 export type RouteLoaders = Readonly<Record<string, RouteLoader>>;
 
-export type StreamixRouteOptions<
-  TName extends string | undefined = string | undefined,
-  TParamsSchema extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
-  TQuerySchema extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
-> = Omit<
-  StreamixRoute<string, TName, TParamsSchema, TQuerySchema>,
-  'kind' | 'path' | 'component' | 'loadComponent'
->;
+export interface StreamixEagerView {
+  readonly component: Type<unknown>;
+  readonly loadComponent?: never;
+}
 
-export interface StreamixRoute<
+export interface StreamixLazyView {
+  readonly component?: never;
+  readonly loadComponent: Lazy<Type<unknown>>;
+}
+
+export type StreamixView =
+  | StreamixEagerView
+  | StreamixLazyView;
+
+export interface StreamixRouteBase<
   TPath extends string = string,
   TName extends string | undefined = string | undefined,
   TParamsSchema extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
@@ -41,37 +46,101 @@ export interface StreamixRoute<
   readonly kind: 'route';
   readonly path: TPath;
   readonly name?: TName;
-  readonly redirectTo?: string;
   readonly outlet?: string;
   readonly preload?: boolean;
-  readonly component?: Type<unknown>;
   readonly viewTransition?: boolean;
   readonly paramsSchema?: TParamsSchema;
   readonly querySchema?: TQuerySchema;
   readonly data?: Readonly<Record<string, unknown>>;
-  readonly loadComponent?: Lazy<Type<unknown>>;
   readonly providers?: StreamixRouteProviders;
   readonly canActivate?: readonly RouterCanActivateFn[];
   readonly canDeactivate?: readonly RouterCanDeactivateFn[];
   readonly resolve?: RouteLoaders;
 }
 
-export type StreamixLayoutOptions = Omit<
-  StreamixLayout,
-  'kind' | 'path' | 'component' | 'loadComponent' | 'entries'
+export type StreamixRouteOptions<
+  TName extends string | undefined = string | undefined,
+  TParamsSchema extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
+  TQuerySchema extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
+> = Omit<
+  StreamixRouteBase<
+    string,
+    TName,
+    TParamsSchema,
+    TQuerySchema
+  >,
+  'kind' | 'path'
 >;
 
-export interface StreamixLayout<
+export interface StreamixRedirectRoute<
+  TPath extends string = string,
+  TName extends string | undefined = string | undefined,
+> extends StreamixRouteBase<
+    TPath,
+    TName,
+    undefined,
+    undefined
+  > {
+  readonly redirectTo: string;
+}
+
+export type StreamixRenderableRoute<
+  TPath extends string = string,
+  TName extends string | undefined = string | undefined,
+  TParamsSchema extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
+  TQuerySchema extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
+> =
+  StreamixRouteBase<
+    TPath,
+    TName,
+    TParamsSchema,
+    TQuerySchema
+  > &
+  StreamixView & {
+  readonly redirectTo?: undefined;
+};
+
+export type StreamixRoute<
+  TPath extends string = string,
+  TName extends string | undefined = string | undefined,
+  TParamsSchema extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
+  TQuerySchema extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
+> =
+  | StreamixRedirectRoute<
+      TPath,
+      TName
+    >
+  | StreamixRenderableRoute<
+      TPath,
+      TName,
+      TParamsSchema,
+      TQuerySchema
+    >;
+
+export interface StreamixLayoutBase<
   TPath extends string = string,
   TEntries extends StreamixRoutes = StreamixRoutes,
 > {
   readonly kind: 'layout';
   readonly path: TPath;
-  readonly component?: Type<unknown>;
-  readonly loadComponent?: Lazy<Type<unknown>>;
   readonly entries: TEntries;
   readonly providers?: StreamixRouteProviders;
 }
+
+export type StreamixLayoutOptions = Omit<
+  StreamixLayoutBase,
+  'kind' | 'path' | 'entries'
+>;
+
+export type StreamixLayout<
+  TPath extends string = string,
+  TEntries extends StreamixRoutes = StreamixRoutes,
+> =
+  StreamixLayoutBase<
+    TPath,
+    TEntries
+  > &
+  StreamixView;
 
 // Any-instantiated route/layout primitives to avoid undefined-widening issues
 export type AnyStreamixRoute = StreamixRoute<any, any, any, any>;

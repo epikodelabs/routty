@@ -41,6 +41,7 @@ import type {
   MaybePromise,
   StreamixLayout,
   StreamixLayoutOptions,
+  StreamixRenderableRoute,
   StreamixRoute,
   StreamixRouteOptions,
   StreamixRoutes
@@ -146,12 +147,7 @@ const lazyComponents =
   >();
 
 function loadComponent(
-  owner: {
-    readonly component?:
-      Type<unknown>;
-    readonly loadComponent?:
-      () => unknown;
-  },
+  owner: StreamixLayout | StreamixRenderableRoute,
 ): Promise<Type<unknown>> {
   if (owner.component) {
     return Promise.resolve(
@@ -397,7 +393,7 @@ function adaptQueryParser(
 
 async function resolveViews(
   layouts: readonly StreamixLayout[],
-  route: StreamixRoute,
+  route: StreamixRenderableRoute,
 ): Promise<readonly ResolvedRouteView[]> {
   const resolvedLayouts = await Promise.all(
     layouts.map(async (layout, index) => ({
@@ -446,7 +442,10 @@ function adaptRoute(
         return {};
       }
 
-      const views = await resolveViews(layouts, route);
+      const views = await resolveViews(
+        layouts,
+        route as StreamixRenderableRoute,
+      );
 
       return {
         component:
