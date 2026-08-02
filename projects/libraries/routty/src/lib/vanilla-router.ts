@@ -455,8 +455,31 @@ function readRedirect(result: GuardResult): { redirectTo: string; replace: boole
   return null;
 }
 
+function replaceChildNodes(
+  target: Node & {
+    replaceChildren?: (...nodes: Node[]) => void;
+    firstChild: ChildNode | null;
+    removeChild(node: ChildNode): void;
+    appendChild<T extends Node>(node: T): T;
+  },
+  ...nodes: Node[]
+): void {
+  if (typeof target.replaceChildren === 'function') {
+    target.replaceChildren(...nodes);
+    return;
+  }
+
+  while (target.firstChild) {
+    target.removeChild(target.firstChild);
+  }
+
+  for (const node of nodes) {
+    target.appendChild(node);
+  }
+}
+
 function defaultRender(outlet: HTMLElement, node: Node): void {
-  outlet.replaceChildren(node);
+  replaceChildNodes(outlet, node);
 }
 
 
@@ -747,7 +770,7 @@ export function createRouter(config: RouterConfig): Router {
 
   function clearOutlet(): void {
     const outlet = resolveOutlet();
-    if (outlet) outlet.replaceChildren();
+    if (outlet) replaceChildNodes(outlet);
   }
 
   function currentHref(): string {

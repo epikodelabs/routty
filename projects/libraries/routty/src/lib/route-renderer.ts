@@ -50,6 +50,29 @@ interface RenderedLayer {
     EnvironmentInjector;
 }
 
+function replaceChildNodes(
+  target: Node & {
+    replaceChildren?: (...nodes: Node[]) => void;
+    firstChild: ChildNode | null;
+    removeChild(node: ChildNode): void;
+    appendChild<T extends Node>(node: T): T;
+  },
+  ...nodes: Node[]
+): void {
+  if (typeof target.replaceChildren === 'function') {
+    target.replaceChildren(...nodes);
+    return;
+  }
+
+  while (target.firstChild) {
+    target.removeChild(target.firstChild);
+  }
+
+  for (const node of nodes) {
+    target.appendChild(node);
+  }
+}
+
 
 function createScopedInjector(
   providers:
@@ -311,9 +334,7 @@ export function composeAngularRouteView(
             );
           }
 
-          outlet.replaceChildren(
-            rendered.node,
-          );
+          replaceChildNodes(outlet, rendered.node);
 
           // Capture the outlet while the node is attached. Parent-layer
           // disposal may detach this host before its own dispose() runs.

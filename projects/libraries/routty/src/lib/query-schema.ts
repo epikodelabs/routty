@@ -358,11 +358,24 @@ export function serializeQueryRecord(
       spec._type === 'array' &&
       Array.isArray(value)
     ) {
-      for (const item of value) {
-        params.append(
-          key,
-          String(item),
+      const defaultValue =
+        getDefault(spec);
+      const isDefault =
+        Array.isArray(defaultValue)
+        && value.length === defaultValue.length
+        && value.every(
+          (item, index) =>
+            item ===
+              defaultValue[index],
         );
+
+      if (!isDefault) {
+        for (const item of value) {
+          params.append(
+            key,
+            String(item),
+          );
+        }
       }
 
       continue;
