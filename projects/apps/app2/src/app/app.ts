@@ -1,24 +1,11 @@
-﻿import {
-  Component,
-  inject,
-} from '@angular/core';
-import {
-  RouterOutlet,
-  RouterLink,
-} from '@epikodelabs/routty';
-import { DemoSessionService } from '../../../app1/src/app/demo-session.service';
+import { Component } from '@angular/core';
+import { RouterOutlet } from '@epikodelabs/routty';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [
-    RouterOutlet,
-    RouterLink,
-  ],
+  imports: [RouterOutlet],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
-export class App {
-  protected readonly session = inject(DemoSessionService);
-}
-
+export class App {}

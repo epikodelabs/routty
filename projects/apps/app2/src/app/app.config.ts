@@ -1,15 +1,21 @@
 import {
   ApplicationConfig,
-  mergeApplicationConfig,
+  ApplicationModule,
+  importProvidersFrom,
+  provideBrowserGlobalErrorListeners,
 } from '@angular/core';
-import { provideClientHydration } from '@angular/platform-browser';
-import { appConfig as browserConfig } from '../../../app1/src/app/app.config';
+import { BrowserModule, provideClientHydration } from '@angular/platform-browser';
+import { provideRouter } from '@epikodelabs/routty';
 
-const hydrationConfig: ApplicationConfig = {
-  providers: [provideClientHydration()],
+import { routes } from './app.routes';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    importProvidersFrom(ApplicationModule, BrowserModule),
+    provideBrowserGlobalErrorListeners(),
+    provideClientHydration(),
+    ...provideRouter(routes, {
+      viewTransitions: true,
+    }),
+  ],
 };
-
-export const appConfig = mergeApplicationConfig(
-  browserConfig,
-  hydrationConfig,
-);
