@@ -87,7 +87,7 @@ function createAngularComponent(
 ): RenderedRouteNode {
   const host =
     document.createElement(
-      'streamix-view',
+      'route-host',
     );
 
   const elementInjector =
