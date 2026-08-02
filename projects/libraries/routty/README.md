@@ -1,60 +1,48 @@
-﻿# @epikodelabs/routty
+# Routty
 
-`@epikodelabs/routty` is a typed Angular routing library for flat route definitions, layout composition, and frame-based lifecycle hooks.
+Routty is a typed Angular routing library for teams that want a smaller, clearer routing model.
 
-It is designed to keep route identity, URL shape, rendering, and lifecycle together.
+It keeps route matching, route identity, rendering, and lifecycle in one place, with flat route definitions, explicit layouts, and function-based hooks.
 
-## Core ideas
+## Why Routty
 
-### Path
+Routty is a strong fit when you want:
 
-`path` is the URL contract. It is used for matching and link generation.
+- typed params and query values
+- readable route definitions that stay close to the feature
+- guards, preparation, and post-navigation behavior beside the route
+- layout composition and named outlets without a deep route tree
+- a standalone-first Angular setup
 
-### Name
+## Installation
 
-`name` is the app-level identity for a primary route. It exists so application code can address a route symbolically instead of coupling everything to literal URLs.
+```bash
+npm install @epikodelabs/routty
+```
 
-Typical uses:
+Routty is built on standalone Angular APIs and is intended to work across recent Angular versions.
 
-- `router.navigate({ name: 'settings' })`
-- `router.navigateTo.settings(...)`
-- `router.hrefTo.settings(...)`
-- `[routerLink]="{ name: 'settings' }"`
-
-### Frame
-
-A `frame` wraps a component together with route lifecycle hooks:
-
-- `beforeEnter`
-- `beforeLeave`
-- `prepare`
-- `afterEnter`
-
-This replaces the need to scatter route behavior across Angular guard and resolver classes.
-
-## Route model
-
-Primary routes define navigation behavior. Secondary outlet entries exist only to render additional content for the same matched primary route.
-
-That means:
-
-- primary routes may have `name`
-- secondary outlet routes should stay subordinate to the primary route
-- layouts compose UI shells, not navigation state machines
-
-## Example
+## Quick start
 
 ```ts
 import { inject } from '@angular/core';
-import { frame, layout, route, s, type NavigationTree } from '@epikodelabs/routty';
+import {
+  frame,
+  layout,
+  provideRouter,
+  route,
+  s,
+  type NavigationTree,
+} from '@epikodelabs/routty';
 
 const projectRoute = route(
   '/projects/:projectId',
   frame(ProjectPage, {
     beforeEnter: [
-      () => inject(SessionService).authenticated()
-        ? true
-        : { redirectTo: '/auth/login', replace: true },
+      () =>
+        inject(SessionService).authenticated()
+          ? true
+          : { redirectTo: '/auth/login', replace: true },
     ],
     prepare: [
       context => ({
@@ -62,9 +50,6 @@ const projectRoute = route(
           Number(context.params['projectId'] ?? 0),
         ),
       }),
-    ],
-    afterEnter: [
-      route => inject(AnalyticsService).trackProjectVisit(route.path),
     ],
   }),
   {
@@ -79,13 +64,24 @@ const projectRoute = route(
 );
 
 export const routes = [
-  layout('/app', AppShellComponent, [
-    projectRoute,
-  ]),
+  layout('/app', AppShellComponent, [projectRoute]),
 ] as const satisfies NavigationTree;
+
+export const appConfig = {
+  providers: [...provideRouter(routes)],
+};
 ```
 
-If you use a named outlet, its companion route intentionally shares the same path as the primary route:
+In templates and standalone components, use `RouterLink` and `RouterOutlet` from Routty.
+
+## Core ideas
+
+- `path` is the URL contract for matching and link generation
+- `name` is the symbolic identity of a primary route for typed navigation
+- `frame` wraps a component with `beforeEnter`, `beforeLeave`, `prepare`, and `afterEnter`
+- `layout` composes a shell around a set of routes
+
+Named outlets are supported, but they stay attached to a primary route and share the same path:
 
 ```ts
 route('/projects/:projectId', ProjectSidebarComponent, {
@@ -93,57 +89,34 @@ route('/projects/:projectId', ProjectSidebarComponent, {
 })
 ```
 
-That route is not a second independently matched page. It is extra content rendered alongside the primary route for the same URL.
+## Included helpers
 
-## Why this shape
+Routty also exports:
 
-Routty tries to keep the model simple:
+- `lazyRoute(...)`
+- `redirectRoute(...)`
+- `RouterLink`
+- `RouterOutlet`
+- typed `navigateTo` and `hrefTo` helpers on the router instance
 
-- URL matching by `path`
-- app-level addressing by `name`
-- lifecycle by `frame`
-- shell composition by `layout`
+## Current scope
 
-That gives you one route definition instead of separate route config, resolver classes, guard classes, and ad hoc data-loading conventions.
+Routty is intentionally focused rather than feature-complete. Today it is best suited to standalone Angular apps that want a typed, explicit routing layer.
 
-## Limitations vs Angular Router
+Current boundaries to keep in mind:
 
-Routty is intentionally narrower than Angular Router. The current tradeoffs are:
+- no `RouterModule.forRoot()` or `RouterModule.forChild()` integration
+- no `loadChildren` or lazy `NgModule` boundaries
+- no Angular `Route` compatibility layer
+- named outlets are subordinate to a primary route and cannot behave like independent pages
 
-- standalone-first components and directives
-- no `NgModule` router integration such as `RouterModule.forRoot()` or `RouterModule.forChild()`
-- no `loadChildren` / lazy `NgModule` boundaries; lazy loading is component- or layout-based
-- no class-based guards or resolver classes; the model is function-based hooks and `inject()`
-- no `CanLoad`; route lifecycle is expressed through `beforeEnter`, `beforeLeave`, `prepare`, and `afterEnter`
-- no matrix-parameter model
-- no Angular `Route` object compatibility layer; Routty uses its own route definitions
-- no full Angular route tree semantics; layouts are composition primitives, not nested router-state nodes
+## Demo
 
-There are also explicit restrictions around secondary outlets:
+See `projects/apps/app1/src/app/app.routes.ts` for a working reference with typed params, redirects, lazy routes, lifecycle hooks, and a coordinated `sidebar` outlet.
 
-- secondary outlet entries cannot define their own `name`
-- secondary outlet entries cannot define `paramsSchema` or `querySchema`
-- secondary outlet entries cannot redirect
-- secondary outlet entries must share the exact path of their primary route
-- primary routes own group-level preload and view-transition behavior
-
-So the library is a better fit when you want a smaller, typed routing surface with explicit lifecycle hooks, and a worse fit when you need broad Angular Router feature parity.
-
-## Testing
-
-This workspace uses the Testify Jasmine harness for library specs:
+## Development
 
 ```bash
+npm run build
 npm test
 ```
-
-## Demo app
-
-See `projects/apps/app1/src/app/app.routes.ts` for the current reference setup using:
-
-- primary routes with typed params and query schemas
-- frame-based `prepare` and guards
-- lazy routes
-- a shell layout
-- a coordinated `sidebar` outlet
-
