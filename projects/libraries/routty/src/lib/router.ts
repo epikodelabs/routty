@@ -763,6 +763,7 @@ export class Router<
   private engine: VanillaRouter | null = null;
   private currentState: RouterState = EMPTY_ROUTER_STATE;
   private readonly outlets = new Map<string, HTMLElement[]>();
+  private tickQueued = false;
 
   public readonly navigateTo: TypedNavigate<TRoutes>;
   public readonly hrefTo: TypedHref<TRoutes>;
@@ -991,6 +992,7 @@ export class Router<
               snapshotRouterState(
                 state,
               );
+            this.requestTick();
           },
 
         onOutletActivate:
@@ -1022,6 +1024,7 @@ export class Router<
       snapshotRouterState(
         engine.state,
       );
+    this.requestTick();
   }
 
   disconnect(
@@ -1305,6 +1308,24 @@ export class Router<
     return registered?.[
       registered.length - 1
     ] ?? null;
+  }
+
+  private requestTick(): void {
+    if (this.tickQueued) {
+      return;
+    }
+
+    this.tickQueued = true;
+
+    queueMicrotask(() => {
+      this.tickQueued = false;
+
+      if (!this.engine) {
+        return;
+      }
+
+      this.appRef.tick();
+    });
   }
 }
 
