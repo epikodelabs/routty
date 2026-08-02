@@ -6,23 +6,23 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "switchboard": {
+    "routty": {
       "projectType": "library",
-      "root": "projects/libraries/switchboard",
-      "sourceRoot": "projects/libraries/switchboard/src",
+      "root": "projects/libraries/routty",
+      "sourceRoot": "projects/libraries/routty/src",
       "prefix": "lib",
       "architect": {
         "build": {
           "builder": "@angular/build:ng-packagr",
           "options": {
-            "project": "projects/libraries/switchboard/ng-package.json"
+            "project": "projects/libraries/routty/ng-package.json"
           },
           "configurations": {
             "production": {
-              "tsConfig": "projects/libraries/switchboard/tsconfig.lib.prod.json"
+              "tsConfig": "projects/libraries/routty/tsconfig.lib.prod.json"
             },
             "development": {
-              "tsConfig": "projects/libraries/switchboard/tsconfig.lib.json"
+              "tsConfig": "projects/libraries/routty/tsconfig.lib.json"
             }
           },
           "defaultConfiguration": "production"
@@ -30,7 +30,7 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
-            "tsConfig": "projects/libraries/switchboard/tsconfig.spec.json"
+            "tsConfig": "projects/libraries/routty/tsconfig.spec.json"
           }
         }
       }

@@ -1,4 +1,4 @@
-import { createRouter, type Route, type Router, type RouterConfig } from '@epikodelabs/switchboard';
+﻿import { createRouter, type Route, type VanillaRouter, type VanillaRouterConfig } from '@epikodelabs/routty';
 import { idescribe } from './env.spec';
 
 function unwrapTestComponent<T>(value: T | { default: T }): T {
@@ -46,7 +46,7 @@ function routeWithComponent(path: string, text: string): Route {
 }
 idescribe('Router', () => {
     let outlet: HTMLElement;
-    let router: Router;
+    let router: VanillaRouter;
     beforeEach(() => {
         // Create a DOM outlet for testing
         outlet = document.createElement('div');
@@ -68,7 +68,7 @@ idescribe('Router', () => {
     });
     describe('creation', () => {
         it('should create a router instance', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 render: (name, node) => {
                     outlet.replaceChildren(node);
@@ -98,7 +98,7 @@ idescribe('Router', () => {
             document.body.removeChild(app);
         });
         it('should normalize baseHref', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 baseHref: '/app/',
                 render: (name, node) => {
@@ -111,7 +111,7 @@ idescribe('Router', () => {
     });
     describe('navigation', () => {
         it('should navigate to a route', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -162,7 +162,7 @@ idescribe('Router', () => {
             expect(onOutletActivate).toHaveBeenCalledWith(outlet, jasmine.objectContaining({ kind: 'about-component' }));
         });
         it('should navigate to the home route', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                 ],
@@ -178,7 +178,7 @@ idescribe('Router', () => {
             expect(outlet.textContent).toBe('Home');
         });
         it('should navigate with replace option', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -196,7 +196,7 @@ idescribe('Router', () => {
             expect(router.state.current?.path).toBe('/about');
         });
         it('should navigate with state', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -234,7 +234,7 @@ idescribe('Router', () => {
         });
         it('should handle navigation to external URLs', async () => {
             const navigateExternal = jasmine.createSpy('navigateExternal');
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 render: (name, node) => {
                     outlet.replaceChildren(node);
@@ -248,7 +248,7 @@ idescribe('Router', () => {
             expect(navigateExternal).toHaveBeenCalledWith(new URL('https://example.com/'));
         });
         it('should handle navigation with query parameters', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                 ],
@@ -263,7 +263,7 @@ idescribe('Router', () => {
             expect(router.state.query).toEqual({ foo: 'bar', baz: 'qux' });
         });
         it('should handle navigation with hash', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                 ],
@@ -349,7 +349,7 @@ idescribe('Router', () => {
             expect(outlet.textContent).toBe('Route');
         });
         it('should match parameterized routes', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'users/:id',
@@ -371,7 +371,7 @@ idescribe('Router', () => {
             expect(router.state.params).toEqual({ id: '123' });
         });
         it('should decode URL parameters', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'users/:id',
@@ -390,7 +390,7 @@ idescribe('Router', () => {
             expect(router.state.current?.params).toEqual({ id: 'hello world' });
         });
         it('should match wildcard routes', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     {
@@ -445,7 +445,7 @@ idescribe('Router', () => {
         });
     describe('guards', () => {
         it('should allow navigation when guard returns true', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'protected',
@@ -467,7 +467,7 @@ idescribe('Router', () => {
             expect(outlet.textContent).toBe('Protected');
         });
         it('should block navigation when guard returns false', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'protected',
@@ -504,7 +504,7 @@ idescribe('Router', () => {
             expect(router.state.current).toBeNull();
         });
         it('should redirect when guard returns a redirect string', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'old',
@@ -525,7 +525,7 @@ idescribe('Router', () => {
             expect(outlet.textContent).toBe('New');
         });
         it('should redirect when guard returns a redirect object', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'old',
@@ -546,7 +546,7 @@ idescribe('Router', () => {
             expect(outlet.textContent).toBe('New');
         });
         it('should support async guards', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'async',
@@ -574,7 +574,7 @@ idescribe('Router', () => {
         });
         it('should execute multiple guards in order', async () => {
             const order: string[] = [];
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'guarded',
@@ -600,7 +600,7 @@ idescribe('Router', () => {
         });
         it('should stop at the first failing guard', async () => {
             const order: string[] = [];
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'guarded',
@@ -626,7 +626,7 @@ idescribe('Router', () => {
             expect(router.state.current).toBeNull();
         });
         it('should work with guard objects', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'protected',
@@ -647,7 +647,7 @@ idescribe('Router', () => {
             expect(router.state.current?.path).toBe('/protected');
         });
         it('should block navigation when canDeactivate returns false', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'edit',
@@ -671,7 +671,7 @@ idescribe('Router', () => {
             expect(router.state.error).toBeNull();
         });
         it('should redirect when canDeactivate returns a redirect', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'edit',
@@ -717,7 +717,7 @@ idescribe('Router', () => {
     });
     describe('prepare data', () => {
         it('should prepare data before navigation', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'user',
@@ -744,7 +744,7 @@ idescribe('Router', () => {
             });
         });
         it('should support async prepare handlers', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'async-data',
@@ -770,7 +770,7 @@ idescribe('Router', () => {
             });
         });
         it('should merge static data and prepared data', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'merged',
@@ -795,7 +795,7 @@ idescribe('Router', () => {
             });
         });
         it('should merge multiple prepare handlers', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'user',
@@ -823,7 +823,7 @@ idescribe('Router', () => {
     });
     describe('redirects', () => {
         it('should handle static redirects', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'old',
@@ -841,7 +841,7 @@ idescribe('Router', () => {
             expect(outlet.textContent).toBe('New Page');
         });
         it('should handle parameterized redirects', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'users/:id',
@@ -865,7 +865,7 @@ idescribe('Router', () => {
             expect(router.state.current?.params).toEqual({ id: '123' });
         });
         it('should enforce max redirect count', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'a',
@@ -890,7 +890,7 @@ idescribe('Router', () => {
         });
         it('should handle cross-origin redirects', async () => {
             const navigateExternal = jasmine.createSpy('navigateExternal');
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'external',
@@ -910,7 +910,7 @@ idescribe('Router', () => {
     });
     describe('lazy loading', () => {
         it('should lazy load components', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'lazy',
@@ -930,7 +930,7 @@ idescribe('Router', () => {
             expect(outlet.textContent).toBe('Lazy Loaded');
         });
         it('should lazy load components with default export', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'lazy-default',
@@ -952,7 +952,7 @@ idescribe('Router', () => {
             expect(outlet.textContent).toBe('Lazy Default');
         });
         it('should handle lazy loading errors', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'error',
@@ -975,7 +975,7 @@ idescribe('Router', () => {
     });
     describe('history management', () => {
         it('should handle back navigation', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -1000,7 +1000,7 @@ idescribe('Router', () => {
             expect(router.state.current?.path).toBe('/about');
         });
         it('should handle forward navigation', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -1027,7 +1027,7 @@ idescribe('Router', () => {
             expect(router.state.current?.path).toBe('/users/123');
         });
         it('should handle popstate events', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -1105,7 +1105,7 @@ idescribe('Router', () => {
             expect(router.state.current?.path).toBe('/');
         });
         it('should restore active URL on blocked navigation', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     {
@@ -1319,7 +1319,7 @@ idescribe('Router', () => {
             expect(settingsLoader).toHaveBeenCalledTimes(1);
         });
         it('should clear stale error state on blocked navigation', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     {
@@ -1350,7 +1350,7 @@ idescribe('Router', () => {
     });
     describe('click interception', () => {
         it('should intercept anchor clicks', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -1372,7 +1372,7 @@ idescribe('Router', () => {
             document.body.removeChild(link);
         });
         it('should not intercept external links', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                 ],
@@ -1392,7 +1392,7 @@ idescribe('Router', () => {
             document.body.removeChild(link);
         });
         it('should not intercept links with modifier keys', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -1412,7 +1412,7 @@ idescribe('Router', () => {
             document.body.removeChild(link);
         });
         it('should not intercept links with download attribute', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                 ],
@@ -1431,7 +1431,7 @@ idescribe('Router', () => {
             document.body.removeChild(link);
         });
         it('should not intercept links with external rel', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                 ],
@@ -1450,7 +1450,7 @@ idescribe('Router', () => {
             document.body.removeChild(link);
         });
         it('should handle hash-only links', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -1477,7 +1477,7 @@ idescribe('Router', () => {
     });
     describe('state management', () => {
         it('should expose current route state', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -1498,7 +1498,7 @@ idescribe('Router', () => {
             expect(router.state.phase).toBeNull();
         });
         it('should expose a base-stripped path when baseHref is configured', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -1517,7 +1517,7 @@ idescribe('Router', () => {
             expect(router.state.current?.url.pathname).toBe('/app/about');
         });
         it('should track navigation phase', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'async',
@@ -1542,7 +1542,7 @@ idescribe('Router', () => {
             expect(router.state.phase).toBeNull();
         });
         it('should track pending state during navigation', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'async',
@@ -1568,7 +1568,7 @@ idescribe('Router', () => {
             expect(router.state.pending).toBeFalse();
         });
         it('should expose error state on navigation failure', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'error',
@@ -1589,7 +1589,7 @@ idescribe('Router', () => {
     });
     describe('lifecycle', () => {
         it('should start and stop the router', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 render: (name, node) => {
                     outlet.replaceChildren(node);
@@ -1603,7 +1603,7 @@ idescribe('Router', () => {
             expect(router.state.pending).toBeFalse();
         });
         it('should prevent starting a disposed router', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 render: (name, node) => {
                     outlet.replaceChildren(node);
@@ -1616,7 +1616,7 @@ idescribe('Router', () => {
             }).toThrowError(/Cannot start a disposed router/);
         });
         it('should prevent navigation after disposal', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 render: (name, node) => {
                     outlet.replaceChildren(node);
@@ -1630,7 +1630,7 @@ idescribe('Router', () => {
             }).toThrowError(/Cannot navigate with a disposed router/);
         });
         it('should clean up event listeners on dispose', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 render: (name, node) => {
                     outlet.replaceChildren(node);
@@ -1645,7 +1645,7 @@ idescribe('Router', () => {
             expect(documentRemoveSpy).toHaveBeenCalledWith('click', jasmine.any(Function));
         });
         it('should stop navigation on dispose', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'slow',
@@ -1671,7 +1671,7 @@ idescribe('Router', () => {
             let disposedComponent = false;
             let abortedSignal = false;
             let attachedAtDisposal = false;
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'first',
@@ -1710,7 +1710,7 @@ idescribe('Router', () => {
     });
     describe('utility methods', () => {
         it('should generate href with baseHref', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 baseHref: '/app/',
                 render: (name, node) => {
@@ -1722,7 +1722,7 @@ idescribe('Router', () => {
             expect(router.href('about')).toBe('/app/about');
         });
         it('should generate href with query parameters', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 render: (name, node) => {
                     outlet.replaceChildren(node);
@@ -1733,7 +1733,7 @@ idescribe('Router', () => {
         });
         it('should resolve relative hrefs from the current location inside baseHref', () => {
             window.history.replaceState(null, '', '/app/section/');
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 baseHref: '/app/',
                 render: (name, node) => {
@@ -1745,7 +1745,7 @@ idescribe('Router', () => {
         });
         it('should resolve relative hrefs from the current location at the root baseHref', () => {
             window.history.replaceState(null, '', '/dashboard/profile');
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 baseHref: '/',
                 render: (name, node) => {
@@ -1756,7 +1756,7 @@ idescribe('Router', () => {
             expect(router.href('settings')).toBe('/dashboard/settings');
         });
         it('should create links with correct href', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 baseHref: '/app/',
                 render: (name, node) => {
@@ -1771,7 +1771,7 @@ idescribe('Router', () => {
             expect(link.href).toContain('/app/about');
         });
         it('should create links without className', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 render: (name, node) => {
                     outlet.replaceChildren(node);
@@ -1786,7 +1786,7 @@ idescribe('Router', () => {
     });
     describe('error handling', () => {
         it('should handle route with no component', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'broken'
@@ -1805,7 +1805,7 @@ idescribe('Router', () => {
         });
         it('should use custom renderError on initial navigation failure', async () => {
             let errorRendered = false;
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'broken'
@@ -1825,7 +1825,7 @@ idescribe('Router', () => {
             expect(outlet.textContent).toContain('Custom Error');
         });
         it('should synchronize state and outlet on navigation error', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     {
@@ -1853,7 +1853,7 @@ idescribe('Router', () => {
             const started = new Promise<void>(resolve => {
                 markStarted = resolve;
             });
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     {
@@ -1885,7 +1885,7 @@ idescribe('Router', () => {
             expect(router.state.current?.path).toBe('/');
         });
         it('should handle guard errors', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'error',
@@ -1909,7 +1909,7 @@ idescribe('Router', () => {
             expect((router.state.error as Error).message).toBe('Guard failed');
         });
         it('should handle prepare errors', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     {
                         path: 'error',
@@ -1934,7 +1934,7 @@ idescribe('Router', () => {
         it('should log debug messages when tracing is enabled', () => {
             const debugSpy = console.debug as jasmine.Spy;
             debugSpy.calls.reset();
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 enableTracing: true, render: (name, node) => {
                     outlet.replaceChildren(node);
@@ -1949,7 +1949,7 @@ idescribe('Router', () => {
         it('should not log debug messages when tracing is disabled', () => {
             const debugSpy = console.debug as jasmine.Spy;
             debugSpy.calls.reset();
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 enableTracing: false, render: (name, node) => {
                     outlet.replaceChildren(node);
@@ -1964,7 +1964,7 @@ idescribe('Router', () => {
     });
     describe('replace method', () => {
         it('should navigate with replace option', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -1982,7 +1982,7 @@ idescribe('Router', () => {
             expect(router.state.current?.path).toBe('/about');
         });
         it('should navigate with replace option and state', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -2001,7 +2001,7 @@ idescribe('Router', () => {
     });
     describe('baseHref handling', () => {
         it('should strip baseHref from URL for routing', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -2020,7 +2020,7 @@ idescribe('Router', () => {
             expect(outlet.textContent).toBe('About');
         });
         it('should reject navigation outside baseHref', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 baseHref: '/app/',
                 render: (name, node) => {
@@ -2034,7 +2034,7 @@ idescribe('Router', () => {
             }).toThrowError(/outside router base/);
         });
         it('should handle baseHref with root path', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                     routeWithComponent('about', 'About'),
@@ -2053,7 +2053,7 @@ idescribe('Router', () => {
         });
         it('should navigate relative URLs from the current location at the root baseHref', async () => {
             window.history.replaceState(null, '', '/dashboard/profile');
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('dashboard/profile', 'Profile'),
                     routeWithComponent('dashboard/settings', 'Settings'),
@@ -2073,7 +2073,7 @@ idescribe('Router', () => {
             expect(outlet.textContent).toBe('Settings');
         });
         it('should handle absolute URLs within baseHref', () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [routeWithComponent('', 'Home')],
                 baseHref: '/app/',
                 render: (name, node) => {
@@ -2087,7 +2087,7 @@ idescribe('Router', () => {
         });
         it('should navigate relative URLs from the current baseHref location', async () => {
             window.history.replaceState(null, '', '/app/section/');
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('section', 'Section'),
                     routeWithComponent('section/child', 'Child'),
@@ -2109,7 +2109,7 @@ idescribe('Router', () => {
     describe('renderNotFound', () => {
         it('should call renderNotFound when route is not found', async () => {
             let notFoundCalled = false;
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                 ],
@@ -2131,7 +2131,7 @@ idescribe('Router', () => {
             expect(router.state.current).toBeNull();
         });
         it('should use default renderNotFound when not provided', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                 ],
@@ -2146,7 +2146,7 @@ idescribe('Router', () => {
             expect(outlet.textContent).toBe('404 — Page Not Found');
         });
         it('should clear the current route when rendering not found', async () => {
-            const config: RouterConfig = {
+            const config: VanillaRouterConfig = {
                 routes: [
                     routeWithComponent('', 'Home'),
                 ],
@@ -2379,3 +2379,4 @@ idescribe('Router', () => {
     });
 
 });
+

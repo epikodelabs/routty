@@ -1,9 +1,9 @@
 {
   "srcDirs": [
-    "./projects/libraries/switchboard/src/lib"
+    "./projects/libraries/routty/src/lib"
   ],
   "testDirs": [
-    "./projects/libraries/switchboard/src/tests"
+    "./projects/libraries/routty/src/tests"
   ],
   "exclude": [
     "**/node_modules/**"
@@ -24,7 +24,7 @@
   "viteConfig": {
     "resolve": {
       "alias": {
-        "@epikodelabs/switchboard": "./dist/switchboard/fesm2022/epikodelabs-switchboard.mjs"
+        "@epikodelabs/routty": "./dist/routty/fesm2022/epikodelabs-routty.mjs"
       }
     }
   },

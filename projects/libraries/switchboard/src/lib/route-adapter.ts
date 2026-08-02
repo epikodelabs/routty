@@ -1,10 +1,10 @@
-import {
+﻿import {
   reflectComponentType,
   type EnvironmentInjector,
   type Type,
 } from '@angular/core';
 
-import type { StreamixRouteProviders } from './route-types';
+import type { NavigationProviders } from './navigation-definitions';
 import type { ActivatedRoute, RouteComponent } from './vanilla-router';
 
 const componentInputs =
@@ -23,7 +23,7 @@ export interface InputBindingTarget {
 export type RouteComponentRenderer = (
   component: Type<unknown>,
   injector: EnvironmentInjector,
-  routeProviders?: StreamixRouteProviders,
+  routeProviders?: NavigationProviders,
 ) => RouteComponent;
 
 export interface RouteAdapterContext {
@@ -34,7 +34,7 @@ export interface RouteAdapterContext {
 export function adaptRouteComponent(
   component: Type<unknown>,
   context: RouteAdapterContext,
-  routeProviders?: StreamixRouteProviders,
+  routeProviders?: NavigationProviders,
 ): RouteComponent {
   return context.render(component, context.injector, routeProviders);
 }
@@ -95,3 +95,4 @@ export function bindRouteInputs(
     }
   }
 }
+

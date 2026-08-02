@@ -1,22 +1,22 @@
-import type { Type } from '@angular/core';
+﻿import type { Type } from '@angular/core';
 
 import type { ParamSchemaRecord, QuerySchemaRecord } from './query-schema';
 import type {
   Lazy,
-  StreamixFrame,
-  StreamixFrameHooks,
-  StreamixLayout,
-  StreamixLayoutOptions,
-  StreamixRedirectRoute,
-  StreamixRenderableRoute,
-  StreamixRouteOptions,
-  StreamixRoutes,
-  StreamixView,
-} from './route-types';
+  FrameView,
+  FrameHooks,
+  LayoutDefinition,
+  LayoutOptions,
+  RedirectRouteDefinition,
+  RenderableRoute,
+  RouteOptions,
+  NavigationTree,
+  ViewDefinition,
+} from './navigation-definitions';
 
 function isFrame(
   value: unknown,
-): value is StreamixFrame {
+): value is FrameView {
   return typeof value === 'object'
     && value !== null
     && 'kind' in value
@@ -24,19 +24,19 @@ function isFrame(
 }
 
 function isEagerFrame(
-  value: StreamixFrame,
-): value is StreamixFrame & { readonly component: Type<unknown> } {
+  value: FrameView,
+): value is FrameView & { readonly component: Type<unknown> } {
   return 'component' in value
     && value.component !== undefined;
 }
 
 type ViewRecord =
-  StreamixView & {
-    readonly frame?: StreamixFrame;
+  ViewDefinition & {
+    readonly frame?: FrameView;
   };
 
 function createViewRecord(
-  view: Type<unknown> | StreamixFrame,
+  view: Type<unknown> | FrameView,
 ): ViewRecord {
   if (isFrame(view)) {
     if (isEagerFrame(view)) {
@@ -59,7 +59,7 @@ function createViewRecord(
 }
 
 function createLazyViewRecord(
-  view: Lazy<Type<unknown>> | StreamixFrame,
+  view: Lazy<Type<unknown>> | FrameView,
 ): ViewRecord {
   if (isFrame(view)) {
     if (isEagerFrame(view)) {
@@ -83,8 +83,8 @@ function createLazyViewRecord(
 
 export function frame(
   component: Type<unknown>,
-  hooks: StreamixFrameHooks = {},
-): StreamixFrame {
+  hooks: FrameHooks = {},
+): FrameView {
   return {
     kind: 'frame',
     component,
@@ -94,8 +94,8 @@ export function frame(
 
 export function lazyFrame(
   loadComponent: Lazy<Type<unknown>>,
-  hooks: StreamixFrameHooks = {},
-): StreamixFrame {
+  hooks: FrameHooks = {},
+): FrameView {
   return {
     kind: 'frame',
     loadComponent,
@@ -114,12 +114,12 @@ export function route<
 >(
   path: TPath,
   component: Type<unknown>,
-  options?: StreamixRouteOptions<
+  options?: RouteOptions<
     TName,
     TParamsSchema,
     TQuerySchema
   >,
-): StreamixRenderableRoute<
+): RenderableRoute<
   TPath,
   TName,
   TParamsSchema,
@@ -135,13 +135,13 @@ export function route<
     QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
-  component: StreamixFrame,
-  options?: StreamixRouteOptions<
+  component: FrameView,
+  options?: RouteOptions<
     TName,
     TParamsSchema,
     TQuerySchema
   >,
-): StreamixRenderableRoute<
+): RenderableRoute<
   TPath,
   TName,
   TParamsSchema,
@@ -157,19 +157,19 @@ export function route<
     QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
-  component: Type<unknown> | StreamixFrame,
-  options: StreamixRouteOptions<
+  component: Type<unknown> | FrameView,
+  options: RouteOptions<
     TName,
     TParamsSchema,
     TQuerySchema
   > = {},
-): StreamixRenderableRoute<
+): RenderableRoute<
   TPath,
   TName,
   TParamsSchema,
   TQuerySchema
 > {
-  const route: StreamixRenderableRoute<
+  const route: RenderableRoute<
     TPath,
     TName,
     TParamsSchema,
@@ -195,12 +195,12 @@ export function lazyRoute<
 >(
   path: TPath,
   loadComponent: Lazy<Type<unknown>>,
-  options?: StreamixRouteOptions<
+  options?: RouteOptions<
     TName,
     TParamsSchema,
     TQuerySchema
   >,
-): StreamixRenderableRoute<
+): RenderableRoute<
   TPath,
   TName,
   TParamsSchema,
@@ -216,13 +216,13 @@ export function lazyRoute<
     QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
-  loadComponent: StreamixFrame,
-  options?: StreamixRouteOptions<
+  loadComponent: FrameView,
+  options?: RouteOptions<
     TName,
     TParamsSchema,
     TQuerySchema
   >,
-): StreamixRenderableRoute<
+): RenderableRoute<
   TPath,
   TName,
   TParamsSchema,
@@ -238,19 +238,19 @@ export function lazyRoute<
     QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
-  loadComponent: Lazy<Type<unknown>> | StreamixFrame,
-  options: StreamixRouteOptions<
+  loadComponent: Lazy<Type<unknown>> | FrameView,
+  options: RouteOptions<
     TName,
     TParamsSchema,
     TQuerySchema
   > = {},
-): StreamixRenderableRoute<
+): RenderableRoute<
   TPath,
   TName,
   TParamsSchema,
   TQuerySchema
 > {
-  const route: StreamixRenderableRoute<
+  const route: RenderableRoute<
     TPath,
     TName,
     TParamsSchema,
@@ -274,10 +274,10 @@ export function redirectRoute<
   path: TPath,
   redirectTo: TRedirectTo,
   options: Omit<
-    StreamixRouteOptions<TName, undefined, undefined>,
+    RouteOptions<TName, undefined, undefined>,
     'redirectTo' | 'paramsSchema' | 'querySchema' | 'outlet'
   > = {},
-): StreamixRedirectRoute<
+): RedirectRouteDefinition<
   TPath,
   TName
 > {
@@ -291,41 +291,41 @@ export function redirectRoute<
 
 export function layout<
   const TPath extends string,
-  const TEntries extends StreamixRoutes,
+  const TEntries extends NavigationTree,
 >(
   path: TPath,
   component: Type<unknown>,
   entries: TEntries,
-  options?: StreamixLayoutOptions,
-): StreamixLayout<
+  options?: LayoutOptions,
+): LayoutDefinition<
   TPath,
   TEntries
 >;
 export function layout<
   const TPath extends string,
-  const TEntries extends StreamixRoutes,
+  const TEntries extends NavigationTree,
 >(
   path: TPath,
-  component: StreamixFrame,
+  component: FrameView,
   entries: TEntries,
-  options?: StreamixLayoutOptions,
-): StreamixLayout<
+  options?: LayoutOptions,
+): LayoutDefinition<
   TPath,
   TEntries
 >;
 export function layout<
   const TPath extends string,
-  const TEntries extends StreamixRoutes,
+  const TEntries extends NavigationTree,
 >(
   path: TPath,
-  component: Type<unknown> | StreamixFrame,
+  component: Type<unknown> | FrameView,
   entries: TEntries,
-  options: StreamixLayoutOptions = {},
-): StreamixLayout<
+  options: LayoutOptions = {},
+): LayoutDefinition<
   TPath,
   TEntries
 > {
-  const layout: StreamixLayout<
+  const layout: LayoutDefinition<
     TPath,
     TEntries
   > = {
@@ -341,41 +341,41 @@ export function layout<
 
 export function lazyLayout<
   const TPath extends string,
-  const TEntries extends StreamixRoutes,
+  const TEntries extends NavigationTree,
 >(
   path: TPath,
   loadComponent: Lazy<Type<unknown>>,
   entries: TEntries,
-  options?: StreamixLayoutOptions,
-): StreamixLayout<
+  options?: LayoutOptions,
+): LayoutDefinition<
   TPath,
   TEntries
 >;
 export function lazyLayout<
   const TPath extends string,
-  const TEntries extends StreamixRoutes,
+  const TEntries extends NavigationTree,
 >(
   path: TPath,
-  loadComponent: StreamixFrame,
+  loadComponent: FrameView,
   entries: TEntries,
-  options?: StreamixLayoutOptions,
-): StreamixLayout<
+  options?: LayoutOptions,
+): LayoutDefinition<
   TPath,
   TEntries
 >;
 export function lazyLayout<
   const TPath extends string,
-  const TEntries extends StreamixRoutes,
+  const TEntries extends NavigationTree,
 >(
   path: TPath,
-  loadComponent: Lazy<Type<unknown>> | StreamixFrame,
+  loadComponent: Lazy<Type<unknown>> | FrameView,
   entries: TEntries,
-  options: StreamixLayoutOptions = {},
-): StreamixLayout<
+  options: LayoutOptions = {},
+): LayoutDefinition<
   TPath,
   TEntries
 > {
-  const layout: StreamixLayout<
+  const layout: LayoutDefinition<
     TPath,
     TEntries
   > = {
@@ -388,3 +388,4 @@ export function lazyLayout<
 
   return layout;
 }
+

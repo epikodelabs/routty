@@ -1,11 +1,11 @@
-import {
+﻿import {
   Component,
   inject,
 } from '@angular/core';
 import {
   RouterOutlet,
-  StreamixRouterLink,
-} from '@epikodelabs/switchboard';
+  RouterLink,
+} from '@epikodelabs/routty';
 import { DemoSessionService } from '../../../app1/src/app/demo-session.service';
 
 @Component({
@@ -13,7 +13,7 @@ import { DemoSessionService } from '../../../app1/src/app/demo-session.service';
   standalone: true,
   imports: [
     RouterOutlet,
-    StreamixRouterLink,
+    RouterLink,
   ],
   templateUrl: './app.html',
   styleUrl: './app.css',
@@ -21,3 +21,4 @@ import { DemoSessionService } from '../../../app1/src/app/demo-session.service';
 export class App {
   protected readonly session = inject(DemoSessionService);
 }
+

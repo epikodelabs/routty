@@ -2,7 +2,7 @@
   "compileOnSave": false,
   "compilerOptions": {
     "paths": {
-      "@epikodelabs/switchboard": ["./projects/libraries/switchboard/src/public-api.ts"]
+      "@epikodelabs/routty": ["./projects/libraries/routty/src/public-api.ts"]
     },
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
@@ -24,10 +24,10 @@
   "files": [],
   "references": [
     {
-      "path": "./projects/libraries/switchboard/tsconfig.lib.json"
+      "path": "./projects/libraries/routty/tsconfig.lib.json"
     },
     {
-      "path": "./projects/libraries/switchboard/tsconfig.spec.json"
+      "path": "./projects/libraries/routty/tsconfig.spec.json"
     },
     {
       "path": "./projects/apps/app1/tsconfig.app.json"

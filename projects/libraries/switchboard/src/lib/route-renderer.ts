@@ -1,4 +1,4 @@
-import {
+﻿import {
   ApplicationRef,
   EnvironmentInjector,
   Injector,
@@ -12,8 +12,8 @@ import {
 } from './route-adapter';
 
 import type {
-  StreamixRouteProviders,
-} from './route-types';
+  NavigationProviders,
+} from './navigation-definitions';
 
 import {
   OUTLET_ACTIVATE_EVENT,
@@ -39,7 +39,7 @@ export interface ResolvedRouteView {
   readonly component:
     Type<unknown>;
   readonly providers?:
-    StreamixRouteProviders;
+    NavigationProviders;
   readonly label: string;
 }
 
@@ -53,7 +53,7 @@ interface RenderedLayer {
 
 function createScopedInjector(
   providers:
-    StreamixRouteProviders | undefined,
+    NavigationProviders | undefined,
   parent: EnvironmentInjector,
   label: string,
 ): EnvironmentInjector | undefined {
@@ -493,3 +493,4 @@ export function composeAngularLeafRouteView(
     }
   };
 }
+

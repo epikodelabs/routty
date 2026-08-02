@@ -1,6 +1,6 @@
-# Switchboard
+# Routty
 
-This workspace includes a manual route playground app under `projects/apps/app1` for checking real browser navigation scenarios against the Switchboard library.
+This workspace includes a manual route playground app under `projects/apps/app1` for checking real browser navigation scenarios against the Routty library.
 
 ## Playground
 
@@ -27,7 +27,7 @@ npm run build:playground
 
 ## Library
 
-Build the Switchboard library with:
+Build the Routty library with:
 
 ```bash
 npm run build

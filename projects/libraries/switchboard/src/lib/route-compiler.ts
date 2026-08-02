@@ -1,20 +1,20 @@
-import type {
-  StreamixLayout,
-  StreamixRoute,
-  StreamixRoutes,
-} from './route-types';
+﻿import type {
+  LayoutDefinition,
+  RouteDefinition,
+  NavigationTree,
+} from './navigation-definitions';
 
 export interface CompiledRoute {
-  readonly route: StreamixRoute;
+  readonly route: RouteDefinition;
   readonly path: string;
   readonly redirectTo?: string;
   readonly layouts:
-    readonly StreamixLayout[];
+    readonly LayoutDefinition[];
 }
 
 export interface CompiledRouteGroup {
   readonly path: string;
-  readonly layouts: readonly StreamixLayout[];
+  readonly layouts: readonly LayoutDefinition[];
   readonly primary: CompiledRoute;
   readonly outlets: readonly CompiledRoute[];
 }
@@ -68,10 +68,10 @@ export function compileRedirect(
 }
 
 export function compileRoutes(
-  entries: StreamixRoutes,
+  entries: NavigationTree,
   parentPath = '/',
   layouts:
-    readonly StreamixLayout[] = [],
+    readonly LayoutDefinition[] = [],
   output: CompiledRoute[] = []
 ): readonly CompiledRoute[] {
   for (const entry of entries) {
@@ -217,7 +217,7 @@ function normalizePattern(
 }
 
 export interface RouteRegistryRecord {
-  readonly route: StreamixRoute;
+  readonly route: RouteDefinition;
   readonly fullPath: string;
 }
 
@@ -232,7 +232,7 @@ export interface RouteRegistry {
 }
 
 export function createRouteRegistry(
-  entries: StreamixRoutes,
+  entries: NavigationTree,
 ): RouteRegistry {
   const namedRoutes =
     new Map<
@@ -244,7 +244,7 @@ export function createRouteRegistry(
   validateRouteGroups(groups);
   
   const literalPaths =
-    new Map<string, StreamixRoute>();
+    new Map<string, RouteDefinition>();
 
   const patterns =
     new Map<string, string>();
@@ -312,3 +312,4 @@ export function createRouteRegistry(
     groups,
   };
 }
+

@@ -1,10 +1,10 @@
-import {
+﻿import {
   layout,
   route,
   s,
-  type StreamixRoutes,
-  type StreamixRouter,
-} from '@epikodelabs/switchboard';
+  type NavigationTree,
+  type Router,
+} from '@epikodelabs/routty';
 
 class DashboardLayout {}
 class DashboardPage {}
@@ -35,9 +35,9 @@ const routes = [
     settingsRoute,
     dashboardRoute,
   ]),
-] as const satisfies StreamixRoutes;
+] as const satisfies NavigationTree;
 
-function assertNamedNavigation(router: StreamixRouter<typeof routes>): void {
+function assertNamedNavigation(router: Router<typeof routes>): void {
   void router.navigateTo.dashboard({
     params: { projectId: 123 },
   });
@@ -73,3 +73,4 @@ describe('typed routes typings', () => {
     expect(typeof assertNamedNavigation).toBe('function');
   });
 });
+

@@ -1,14 +1,14 @@
-import { ensureAngularTestEnvironment } from './angular-testbed.init';
+﻿import { ensureAngularTestEnvironment } from './angular-testbed.init';
 
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import {
   RouterLink,
   RouterOutlet,
-  StreamixRouter,
-  provideStreamixRouter,
+  Router,
+  provideRouter,
   route,
-} from '@epikodelabs/switchboard';
+} from '@epikodelabs/routty';
 
 ensureAngularTestEnvironment();
 
@@ -60,8 +60,8 @@ class RouterLinkHostComponent {
   target = '/about';
 }
 
-describe('StreamixRouterLink', () => {
-  let router: StreamixRouter;
+describe('RouterLink', () => {
+  let router: Router;
 
   beforeEach(() => {
     TestBed.resetTestingModule();
@@ -80,7 +80,7 @@ describe('StreamixRouterLink', () => {
         RouterLinkHostComponent,
       ],
       providers: [
-        ...provideStreamixRouter([
+        ...provideRouter([
           route('/', HomeComponent),
           route('/about', AboutComponent),
         ]),
@@ -88,7 +88,7 @@ describe('StreamixRouterLink', () => {
     }).compileComponents();
 
     const fixture = TestBed.createComponent(RouterLinkHostComponent);
-    router = TestBed.inject(StreamixRouter);
+    router = TestBed.inject(Router);
 
     fixture.detectChanges();
     await delay();
@@ -110,3 +110,4 @@ describe('StreamixRouterLink', () => {
     expect(host.textContent).toContain('About');
   });
 });
+

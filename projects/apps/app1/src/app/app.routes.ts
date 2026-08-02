@@ -1,4 +1,4 @@
-import { inject } from '@angular/core';
+﻿import { inject } from '@angular/core';
 import {
   frame,
   lazyRoute,
@@ -6,8 +6,8 @@ import {
   redirectRoute,
   route,
   s,
-  type StreamixRoutes,
-} from '@epikodelabs/switchboard';
+  type NavigationTree,
+} from '@epikodelabs/routty';
 
 import {
   AdminPage,
@@ -156,4 +156,5 @@ export const routes = [
       outlet: 'sidebar',
     }),
   ]),
-] as const satisfies StreamixRoutes;
+] as const satisfies NavigationTree;
+

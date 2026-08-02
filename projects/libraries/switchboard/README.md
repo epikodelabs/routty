@@ -1,6 +1,6 @@
-# @epikodelabs/switchboard
+﻿# @epikodelabs/routty
 
-`@epikodelabs/switchboard` is a typed Angular routing library for flat route definitions, layout composition, and frame-based lifecycle hooks.
+`@epikodelabs/routty` is a typed Angular routing library for flat route definitions, layout composition, and frame-based lifecycle hooks.
 
 It is designed to keep route identity, URL shape, rendering, and lifecycle together.
 
@@ -46,7 +46,7 @@ That means:
 
 ```ts
 import { inject } from '@angular/core';
-import { frame, layout, route, s, type StreamixRoutes } from '@epikodelabs/switchboard';
+import { frame, layout, route, s, type NavigationTree } from '@epikodelabs/routty';
 
 const projectRoute = route(
   '/projects/:projectId',
@@ -82,7 +82,7 @@ export const routes = [
   layout('/app', AppShellComponent, [
     projectRoute,
   ]),
-] as const satisfies StreamixRoutes;
+] as const satisfies NavigationTree;
 ```
 
 If you use a named outlet, its companion route intentionally shares the same path as the primary route:
@@ -97,7 +97,7 @@ That route is not a second independently matched page. It is extra content rende
 
 ## Why this shape
 
-Switchboard tries to keep the model simple:
+Routty tries to keep the model simple:
 
 - URL matching by `path`
 - app-level addressing by `name`
@@ -108,7 +108,7 @@ That gives you one route definition instead of separate route config, resolver c
 
 ## Limitations vs Angular Router
 
-Switchboard is intentionally narrower than Angular Router. The current tradeoffs are:
+Routty is intentionally narrower than Angular Router. The current tradeoffs are:
 
 - standalone-first components and directives
 - no `NgModule` router integration such as `RouterModule.forRoot()` or `RouterModule.forChild()`
@@ -116,7 +116,7 @@ Switchboard is intentionally narrower than Angular Router. The current tradeoffs
 - no class-based guards or resolver classes; the model is function-based hooks and `inject()`
 - no `CanLoad`; route lifecycle is expressed through `beforeEnter`, `beforeLeave`, `prepare`, and `afterEnter`
 - no matrix-parameter model
-- no Angular `Route` object compatibility layer; Switchboard uses its own route definitions
+- no Angular `Route` object compatibility layer; Routty uses its own route definitions
 - no full Angular route tree semantics; layouts are composition primitives, not nested router-state nodes
 
 There are also explicit restrictions around secondary outlets:
@@ -146,3 +146,4 @@ See `projects/apps/app1/src/app/app.routes.ts` for the current reference setup u
 - lazy routes
 - a shell layout
 - a coordinated `sidebar` outlet
+
