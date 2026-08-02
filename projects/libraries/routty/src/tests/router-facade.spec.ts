@@ -84,7 +84,7 @@ describe('Router: flat routes and layouts', () => {
 
   async function navigate(path: string): Promise<void> {
     await router.navigate({ path });
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
   beforeEach(() => {
@@ -110,9 +110,7 @@ describe('Router: flat routes and layouts', () => {
 
   it('supports a layout index route', async () => {
     const routes = [
-      layout('/admin', ParentComponent, [
-        route('', HomeComponent),
-      ]),
+      layout('/admin', ParentComponent, [route('', HomeComponent)]),
     ] as const satisfies NavigationTree;
 
     bootstrap(routes);
@@ -125,9 +123,7 @@ describe('Router: flat routes and layouts', () => {
 
   it('renders an eager layout around an eager leaf route', async () => {
     const routes = [
-      layout('/admin', ParentComponent, [
-        route('/child', ChildComponent),
-      ]),
+      layout('/admin', ParentComponent, [route('/child', ChildComponent)]),
     ] as const satisfies NavigationTree;
 
     bootstrap(routes);
@@ -140,9 +136,7 @@ describe('Router: flat routes and layouts', () => {
 
   it('inherits the layout path prefix', async () => {
     const routes = [
-      layout('/admin', ParentComponent, [
-        route('/settings', SettingsComponent),
-      ]),
+      layout('/admin', ParentComponent, [route('/settings', SettingsComponent)]),
     ] as const satisfies NavigationTree;
 
     bootstrap(routes);
@@ -154,9 +148,7 @@ describe('Router: flat routes and layouts', () => {
 
   it('renders an eager layout around a lazy leaf route', async () => {
     const routes = [
-      layout('/admin', ParentComponent, [
-        lazyRoute('/lazy-child', async () => ChildComponent),
-      ]),
+      layout('/admin', ParentComponent, [lazyRoute('/lazy-child', async () => ChildComponent)]),
     ] as const satisfies NavigationTree;
 
     bootstrap(routes);
@@ -169,9 +161,7 @@ describe('Router: flat routes and layouts', () => {
 
   it('renders a lazy layout around an eager leaf route', async () => {
     const routes = [
-      lazyLayout('/admin', async () => ParentComponent, [
-        route('/child', ChildComponent),
-      ]),
+      lazyLayout('/admin', async () => ParentComponent, [route('/child', ChildComponent)]),
     ] as const satisfies NavigationTree;
 
     bootstrap(routes);
@@ -200,9 +190,7 @@ describe('Router: flat routes and layouts', () => {
   it('composes multiple layouts without creating a route hierarchy', async () => {
     const routes = [
       layout('/app', ShellComponent, [
-        layout('/admin', ParentComponent, [
-          route('/child', ChildComponent),
-        ]),
+        layout('/admin', ParentComponent, [route('/child', ChildComponent)]),
       ]),
     ] as const satisfies NavigationTree;
 
@@ -296,6 +284,6 @@ describe('Router: flat routes and layouts', () => {
     expect(content).toContain('<h3>Settings</h3>');
     expect(content).toContain('<h1>Home</h1>');
     expect(router.state.path).toBe('/app/settings');
+    expect(router.displayUrl).toBe('/app/settings');
   });
 });
-
