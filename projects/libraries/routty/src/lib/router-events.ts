@@ -2,10 +2,6 @@ export const OUTLET_ACTIVATE_EVENT = 'routty:outlet-activate';
 export const OUTLET_DEACTIVATE_EVENT = 'routty:outlet-deactivate';
 export const ROUTER_LOCATION_CHANGE_EVENT = 'routty:location-change';
 
-const LEGACY_OUTLET_ACTIVATE_EVENT = 'vanilla-router-activate';
-const LEGACY_OUTLET_DEACTIVATE_EVENT = 'vanilla-router-deactivate';
-const LEGACY_ROUTER_LOCATION_CHANGE_EVENT = 'vanilla-router-locationchange';
-
 const OUTLET_QUERY = 'router-outlet';
 
 function isOutletElement(
@@ -27,15 +23,10 @@ export function dispatchOutletLifecycleEvent(
   type: typeof OUTLET_ACTIVATE_EVENT | typeof OUTLET_DEACTIVATE_EVENT,
   component: unknown,
 ): void {
-  target.dispatchEvent(new CustomEvent(type, { detail: component }));
-
-  const legacyType =
-    type === OUTLET_ACTIVATE_EVENT
-      ? LEGACY_OUTLET_ACTIVATE_EVENT
-      : LEGACY_OUTLET_DEACTIVATE_EVENT;
-
   target.dispatchEvent(
-    new CustomEvent(legacyType, { detail: component }),
+    new CustomEvent(type, {
+      detail: component,
+    }),
   );
 }
 
@@ -44,8 +35,11 @@ export function dispatchRouterLocationChange(): void {
     return;
   }
 
-  window.dispatchEvent(new CustomEvent(ROUTER_LOCATION_CHANGE_EVENT));
-  window.dispatchEvent(new CustomEvent(LEGACY_ROUTER_LOCATION_CHANGE_EVENT));
+  window.dispatchEvent(
+    new CustomEvent(
+      ROUTER_LOCATION_CHANGE_EVENT,
+    ),
+  );
 }
 
 export function findOutlet(
