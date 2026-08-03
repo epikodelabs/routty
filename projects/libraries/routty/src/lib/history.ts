@@ -1,4 +1,3 @@
-
 export interface ScrollPosition {
   readonly x: number;
   readonly y: number;

@@ -1,4 +1,4 @@
-﻿import { createRouter, type Route, type VanillaRouter, type VanillaRouterConfig } from '@epikodelabs/routty';
+import { createRouter, type Route, type VanillaRouter, type VanillaRouterConfig } from '@epikodelabs/routty';
 import { idescribe } from './env.spec';
 
 function unwrapTestComponent<T>(value: T | { default: T }): T {
@@ -2379,4 +2379,3 @@ idescribe('Router', () => {
     });
 
 });
-

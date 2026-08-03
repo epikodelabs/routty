@@ -1,4 +1,4 @@
-﻿import { APP_BASE_HREF, DOCUMENT } from '@angular/common';
+import { APP_BASE_HREF, DOCUMENT } from '@angular/common';
 
 import {
   ApplicationRef,
@@ -163,56 +163,6 @@ function execute<TContext, TResult>(
   context: TContext,
 ): Promise<TResult> {
   return runWithInjector(injector, handler, context);
-}
-
-function adaptCanActivate(
-  handlers: readonly CanActivateFn[] | undefined,
-  injector: EnvironmentInjector,
-): Route['canActivate'] {
-  return handlers?.map((handler) => async (context) => {
-    const value = await execute(injector, handler, context);
-
-    if (value instanceof URL) {
-      return value.href;
-    }
-
-    if (value && typeof value === 'object' && 'redirectTo' in value) {
-      const rawRedirect = value.redirectTo as any;
-      const redirectTo = rawRedirect instanceof URL ? rawRedirect.href : String(rawRedirect);
-
-      return {
-        ...value,
-        redirectTo,
-      };
-    }
-
-    return value as boolean | string;
-  });
-}
-
-function adaptCanDeactivate(
-  handlers: readonly CanDeactivateFn[] | undefined,
-  injector: EnvironmentInjector,
-): Route['canDeactivate'] {
-  return handlers?.map((handler) => async (context) => {
-    const value = await execute(injector, handler, context);
-
-    if (value instanceof URL) {
-      return value.href;
-    }
-
-    if (value && typeof value === 'object' && 'redirectTo' in value) {
-      const rawRedirect = value.redirectTo as any;
-      const redirectTo = rawRedirect instanceof URL ? rawRedirect.href : String(rawRedirect);
-
-      return {
-        ...value,
-        redirectTo,
-      };
-    }
-
-    return value as boolean | string;
-  });
 }
 
 function adaptFrameBeforeEnter(
@@ -419,8 +369,6 @@ function adaptRoute(
         component: route.outlet
           ? composeAngularLeafRouteView(appRef, injector, tokens, views)
           : composeAngularRouteView(appRef, injector, tokens, views),
-        canActivate: adaptCanActivate(route.canActivate, injector),
-        canDeactivate: adaptCanDeactivate(route.canDeactivate, injector),
         prepare: [
           ...(sharedPreparers ?? []),
           ...(adaptFramePreparers(

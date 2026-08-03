@@ -1,4 +1,4 @@
-﻿export * from './navigation-targets';
+export * from './navigation-targets';
 export { RouterOutlet } from './router-outlet';
 export * from './query-schema';
 export * from './route-adapter';
@@ -41,6 +41,3 @@ export {
     provideRouter, ROUTE,
     ROUTE_CONTEXT, Router, type RouterOptions
 } from './router';
-
-
-

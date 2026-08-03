@@ -1,4 +1,4 @@
-﻿import {
+import {
   layout,
   route,
   s,
@@ -73,4 +73,3 @@ describe('typed routes typings', () => {
     expect(typeof assertNamedNavigation).toBe('function');
   });
 });
-

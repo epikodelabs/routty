@@ -1,4 +1,4 @@
-﻿import {
+import {
   ApplicationRef,
   EnvironmentInjector,
   Injector,
@@ -514,4 +514,3 @@ export function composeAngularLeafRouteView(
     }
   };
 }
-

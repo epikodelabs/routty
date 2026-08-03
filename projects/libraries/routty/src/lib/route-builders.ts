@@ -1,22 +1,22 @@
-﻿import type { Type } from '@angular/core';
+import type { Type } from '@angular/core';
 
 import type { ParamSchemaRecord, QuerySchemaRecord } from './query-schema';
 import type {
-  Lazy,
-  FrameView,
   FrameHooks,
+  FramePrepareFn,
+  FrameView,
+  InferPreparedData,
   LayoutDefinition,
   LayoutOptions,
+  Lazy,
+  NavigationTree,
   RedirectRouteDefinition,
   RenderableRoute,
   RouteOptions,
-  NavigationTree,
   ViewDefinition,
 } from './navigation-definitions';
 
-function isFrame(
-  value: unknown,
-): value is FrameView {
+function isFrame(value: unknown): value is FrameView<any> {
   return typeof value === 'object'
     && value !== null
     && 'kind' in value
@@ -24,19 +24,24 @@ function isFrame(
 }
 
 function isEagerFrame(
-  value: FrameView,
-): value is FrameView & { readonly component: Type<unknown> } {
-  return 'component' in value
-    && value.component !== undefined;
+  value: FrameView<any>,
+): value is FrameView<any> & { readonly component: Type<unknown> } {
+  return 'component' in value && value.component !== undefined;
 }
 
-type ViewRecord =
+type ViewRecord<TFrame extends FrameView<any> | undefined = FrameView<any> | undefined> =
   ViewDefinition & {
-    readonly frame?: FrameView;
+    readonly frame?: TFrame;
   };
 
+function createViewRecord<TFrame extends FrameView<any>>(
+  view: TFrame,
+): ViewRecord<TFrame>;
 function createViewRecord(
-  view: Type<unknown> | FrameView,
+  view: Type<unknown>,
+): ViewRecord<undefined>;
+function createViewRecord(
+  view: Type<unknown> | FrameView<any>,
 ): ViewRecord {
   if (isFrame(view)) {
     if (isEagerFrame(view)) {
@@ -58,8 +63,14 @@ function createViewRecord(
   };
 }
 
+function createLazyViewRecord<TFrame extends FrameView<any>>(
+  view: TFrame,
+): ViewRecord<TFrame>;
 function createLazyViewRecord(
-  view: Lazy<Type<unknown>> | FrameView,
+  view: Lazy<Type<unknown>>,
+): ViewRecord<undefined>;
+function createLazyViewRecord(
+  view: Lazy<Type<unknown>> | FrameView<any>,
 ): ViewRecord {
   if (isFrame(view)) {
     if (isEagerFrame(view)) {
@@ -81,10 +92,12 @@ function createLazyViewRecord(
   };
 }
 
-export function frame(
+export function frame<
+  const TPrepare extends readonly FramePrepareFn[] | undefined = undefined,
+>(
   component: Type<unknown>,
-  hooks: FrameHooks = {},
-): FrameView {
+  hooks: FrameHooks<TPrepare> = {} as FrameHooks<TPrepare>,
+): FrameView<InferPreparedData<TPrepare>> {
   return {
     kind: 'frame',
     component,
@@ -92,10 +105,12 @@ export function frame(
   };
 }
 
-export function lazyFrame(
+export function lazyFrame<
+  const TPrepare extends readonly FramePrepareFn[] | undefined = undefined,
+>(
   loadComponent: Lazy<Type<unknown>>,
-  hooks: FrameHooks = {},
-): FrameView {
+  hooks: FrameHooks<TPrepare> = {} as FrameHooks<TPrepare>,
+): FrameView<InferPreparedData<TPrepare>> {
   return {
     kind: 'frame',
     loadComponent,
@@ -105,171 +120,86 @@ export function lazyFrame(
 
 export function route<
   const TPath extends string,
-  const TName extends
-    string | undefined = undefined,
-  const TParamsSchema extends
-    ParamSchemaRecord | undefined = undefined,
-  const TQuerySchema extends
-    QuerySchemaRecord | undefined = undefined,
+  const TName extends string | undefined = undefined,
+  const TParamsSchema extends ParamSchemaRecord | undefined = undefined,
+  const TQuerySchema extends QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
   component: Type<unknown>,
-  options?: RouteOptions<
-    TName,
-    TParamsSchema,
-    TQuerySchema
-  >,
-): RenderableRoute<
-  TPath,
-  TName,
-  TParamsSchema,
-  TQuerySchema
->;
+  options?: RouteOptions<TName, TParamsSchema, TQuerySchema>,
+): RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema, undefined>;
 export function route<
   const TPath extends string,
-  const TName extends
-    string | undefined = undefined,
-  const TParamsSchema extends
-    ParamSchemaRecord | undefined = undefined,
-  const TQuerySchema extends
-    QuerySchemaRecord | undefined = undefined,
+  const TFrame extends FrameView<any>,
+  const TName extends string | undefined = undefined,
+  const TParamsSchema extends ParamSchemaRecord | undefined = undefined,
+  const TQuerySchema extends QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
-  component: FrameView,
-  options?: RouteOptions<
-    TName,
-    TParamsSchema,
-    TQuerySchema
-  >,
-): RenderableRoute<
-  TPath,
-  TName,
-  TParamsSchema,
-  TQuerySchema
->;
+  component: TFrame,
+  options?: RouteOptions<TName, TParamsSchema, TQuerySchema>,
+): RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema, TFrame>;
 export function route<
   const TPath extends string,
-  const TName extends
-    string | undefined = undefined,
-  const TParamsSchema extends
-    ParamSchemaRecord | undefined = undefined,
-  const TQuerySchema extends
-    QuerySchemaRecord | undefined = undefined,
+  const TName extends string | undefined = undefined,
+  const TParamsSchema extends ParamSchemaRecord | undefined = undefined,
+  const TQuerySchema extends QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
-  component: Type<unknown> | FrameView,
-  options: RouteOptions<
-    TName,
-    TParamsSchema,
-    TQuerySchema
-  > = {},
-): RenderableRoute<
-  TPath,
-  TName,
-  TParamsSchema,
-  TQuerySchema
-> {
-  const route: RenderableRoute<
-    TPath,
-    TName,
-    TParamsSchema,
-    TQuerySchema
-  > = {
+  component: Type<unknown> | FrameView<any>,
+  options: RouteOptions<TName, TParamsSchema, TQuerySchema> = {},
+): RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema> {
+  return {
     kind: 'route',
     path,
-    ...createViewRecord(component),
+    ...createViewRecord(component as Type<unknown>),
     ...options,
-  };
-
-  return route;
+  } as RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema>;
 }
 
 export function lazyRoute<
   const TPath extends string,
-  const TName extends
-    string | undefined = undefined,
-  const TParamsSchema extends
-    ParamSchemaRecord | undefined = undefined,
-  const TQuerySchema extends
-    QuerySchemaRecord | undefined = undefined,
+  const TName extends string | undefined = undefined,
+  const TParamsSchema extends ParamSchemaRecord | undefined = undefined,
+  const TQuerySchema extends QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
   loadComponent: Lazy<Type<unknown>>,
-  options?: RouteOptions<
-    TName,
-    TParamsSchema,
-    TQuerySchema
-  >,
-): RenderableRoute<
-  TPath,
-  TName,
-  TParamsSchema,
-  TQuerySchema
->;
+  options?: RouteOptions<TName, TParamsSchema, TQuerySchema>,
+): RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema, undefined>;
 export function lazyRoute<
   const TPath extends string,
-  const TName extends
-    string | undefined = undefined,
-  const TParamsSchema extends
-    ParamSchemaRecord | undefined = undefined,
-  const TQuerySchema extends
-    QuerySchemaRecord | undefined = undefined,
+  const TFrame extends FrameView<any>,
+  const TName extends string | undefined = undefined,
+  const TParamsSchema extends ParamSchemaRecord | undefined = undefined,
+  const TQuerySchema extends QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
-  loadComponent: FrameView,
-  options?: RouteOptions<
-    TName,
-    TParamsSchema,
-    TQuerySchema
-  >,
-): RenderableRoute<
-  TPath,
-  TName,
-  TParamsSchema,
-  TQuerySchema
->;
+  loadComponent: TFrame,
+  options?: RouteOptions<TName, TParamsSchema, TQuerySchema>,
+): RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema, TFrame>;
 export function lazyRoute<
   const TPath extends string,
-  const TName extends
-    string | undefined = undefined,
-  const TParamsSchema extends
-    ParamSchemaRecord | undefined = undefined,
-  const TQuerySchema extends
-    QuerySchemaRecord | undefined = undefined,
+  const TName extends string | undefined = undefined,
+  const TParamsSchema extends ParamSchemaRecord | undefined = undefined,
+  const TQuerySchema extends QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
-  loadComponent: Lazy<Type<unknown>> | FrameView,
-  options: RouteOptions<
-    TName,
-    TParamsSchema,
-    TQuerySchema
-  > = {},
-): RenderableRoute<
-  TPath,
-  TName,
-  TParamsSchema,
-  TQuerySchema
-> {
-  const route: RenderableRoute<
-    TPath,
-    TName,
-    TParamsSchema,
-    TQuerySchema
-  > = {
+  loadComponent: Lazy<Type<unknown>> | FrameView<any>,
+  options: RouteOptions<TName, TParamsSchema, TQuerySchema> = {},
+): RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema> {
+  return {
     kind: 'route',
     path,
-    ...createLazyViewRecord(loadComponent),
+    ...createLazyViewRecord(loadComponent as Lazy<Type<unknown>>),
     ...options,
-  };
-
-  return route;
+  } as RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema>;
 }
 
 export function redirectRoute<
   const TPath extends string,
   const TRedirectTo extends string,
-  const TName extends
-    string | undefined = undefined,
+  const TName extends string | undefined = undefined,
 >(
   path: TPath,
   redirectTo: TRedirectTo,
@@ -277,10 +207,7 @@ export function redirectRoute<
     RouteOptions<TName, undefined, undefined>,
     'redirectTo' | 'paramsSchema' | 'querySchema' | 'outlet'
   > = {},
-): RedirectRouteDefinition<
-  TPath,
-  TName
-> {
+): RedirectRouteDefinition<TPath, TName> {
   return {
     kind: 'route',
     path,
@@ -297,46 +224,33 @@ export function layout<
   component: Type<unknown>,
   entries: TEntries,
   options?: LayoutOptions,
-): LayoutDefinition<
-  TPath,
-  TEntries
->;
+): LayoutDefinition<TPath, TEntries, undefined>;
 export function layout<
   const TPath extends string,
   const TEntries extends NavigationTree,
+  const TFrame extends FrameView<any>,
 >(
   path: TPath,
-  component: FrameView,
+  component: TFrame,
   entries: TEntries,
   options?: LayoutOptions,
-): LayoutDefinition<
-  TPath,
-  TEntries
->;
+): LayoutDefinition<TPath, TEntries, TFrame>;
 export function layout<
   const TPath extends string,
   const TEntries extends NavigationTree,
 >(
   path: TPath,
-  component: Type<unknown> | FrameView,
+  component: Type<unknown> | FrameView<any>,
   entries: TEntries,
   options: LayoutOptions = {},
-): LayoutDefinition<
-  TPath,
-  TEntries
-> {
-  const layout: LayoutDefinition<
-    TPath,
-    TEntries
-  > = {
+): LayoutDefinition<TPath, TEntries> {
+  return {
     kind: 'layout',
     path,
-    ...createViewRecord(component),
+    ...createViewRecord(component as Type<unknown>),
     entries,
     ...options,
-  };
-
-  return layout;
+  } as LayoutDefinition<TPath, TEntries>;
 }
 
 export function lazyLayout<
@@ -347,45 +261,31 @@ export function lazyLayout<
   loadComponent: Lazy<Type<unknown>>,
   entries: TEntries,
   options?: LayoutOptions,
-): LayoutDefinition<
-  TPath,
-  TEntries
->;
+): LayoutDefinition<TPath, TEntries, undefined>;
 export function lazyLayout<
   const TPath extends string,
   const TEntries extends NavigationTree,
+  const TFrame extends FrameView<any>,
 >(
   path: TPath,
-  loadComponent: FrameView,
+  loadComponent: TFrame,
   entries: TEntries,
   options?: LayoutOptions,
-): LayoutDefinition<
-  TPath,
-  TEntries
->;
+): LayoutDefinition<TPath, TEntries, TFrame>;
 export function lazyLayout<
   const TPath extends string,
   const TEntries extends NavigationTree,
 >(
   path: TPath,
-  loadComponent: Lazy<Type<unknown>> | FrameView,
+  loadComponent: Lazy<Type<unknown>> | FrameView<any>,
   entries: TEntries,
   options: LayoutOptions = {},
-): LayoutDefinition<
-  TPath,
-  TEntries
-> {
-  const layout: LayoutDefinition<
-    TPath,
-    TEntries
-  > = {
+): LayoutDefinition<TPath, TEntries> {
+  return {
     kind: 'layout',
     path,
-    ...createLazyViewRecord(loadComponent),
+    ...createLazyViewRecord(loadComponent as Lazy<Type<unknown>>),
     entries,
     ...options,
-  };
-
-  return layout;
+  } as LayoutDefinition<TPath, TEntries>;
 }
-

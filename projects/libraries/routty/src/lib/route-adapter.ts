@@ -1,4 +1,4 @@
-﻿import {
+import {
   reflectComponentType,
   type EnvironmentInjector,
   type Type,
@@ -95,4 +95,3 @@ export function bindRouteInputs(
     }
   }
 }
-

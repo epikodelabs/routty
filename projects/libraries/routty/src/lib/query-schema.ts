@@ -12,9 +12,7 @@ export type QuerySchema =
   | NonOptionalSchema
   | OptionalSchema<NonOptionalSchema>;
 
-export type ParamSchema =
-  | ScalarSchema
-  | OptionalSchema<ScalarSchema>;
+export type ParamSchema = ScalarSchema;
 
 export type QuerySchemaRecord = Readonly<Record<string, QuerySchema>>;
 export type ParamSchemaRecord = Readonly<Record<string, ParamSchema>>;
@@ -117,13 +115,7 @@ export type InferQueryInputType<T extends Record<string, QuerySchema>> = {
 };
 
 export type InferParamType<T extends Record<string, ParamSchema>> = {
-  [K in keyof T as T[K] extends OptionalSchema<ScalarSchema>
-    ? never
-    : K]: SchemaValue<T[K]>;
-} & {
-  [K in keyof T as T[K] extends OptionalSchema<ScalarSchema>
-    ? K
-    : never]?: SchemaValue<T[K]>;
+  [K in keyof T]: SchemaValue<T[K]>;
 };
 
 function parseValue(
@@ -140,36 +132,42 @@ function parseValue(
       return raw;
     case 'number': {
       const value = Number(raw);
-      if (Number.isNaN(value)) {
-        if (spec.default !== undefined) {
-          return spec.default;
-        }
-
+      if (!Number.isFinite(value)) {
         throw new Error(
           `Invalid number value "${raw}".`,
         );
       }
 
-      const min = spec.min ?? -Infinity;
-      const max = spec.max ?? Infinity;
-      return Math.max(min, Math.min(max, value));
+      if (spec.min !== undefined && value < spec.min) {
+        throw new Error(
+          `Number value "${raw}" is below the minimum ${spec.min}.`,
+        );
+      }
+
+      if (spec.max !== undefined && value > spec.max) {
+        throw new Error(
+          `Number value "${raw}" is above the maximum ${spec.max}.`,
+        );
+      }
+
+      return value;
     }
     case 'boolean':
-      return raw === 'true' || raw === '1'
-        ? true
-        : raw === 'false' || raw === '0'
-          ? false
-          : (spec.default ?? false);
+      if (raw === 'true' || raw === '1') {
+        return true;
+      }
+
+      if (raw === 'false' || raw === '0') {
+        return false;
+      }
+
+      throw new Error(
+        `Invalid boolean value "${raw}". Expected true, false, 1, or 0.`,
+      );
     case 'date': {
       const value = new Date(raw);
       if (!Number.isNaN(value.getTime())) {
         return value;
-      }
-
-      if (spec.default) {
-        return new Date(
-          spec.default.getTime(),
-        );
       }
 
       throw new Error(
@@ -193,25 +191,6 @@ function getDefault(spec: QuerySchema): unknown {
       return spec.default ?? false;
     case 'array':
       return Object.freeze([...(spec.default ?? [])]);
-    case 'date':
-      return spec.default
-        ? new Date(spec.default.getTime())
-        : new Date();
-    case 'optional':
-      return undefined;
-    default:
-      return undefined;
-  }
-}
-
-function getParamDefault(spec: ParamSchema): unknown {
-  switch (spec._type) {
-    case 'string':
-      return spec.default ?? '';
-    case 'number':
-      return spec.default ?? 0;
-    case 'boolean':
-      return spec.default ?? false;
     case 'date':
       return spec.default
         ? new Date(spec.default.getTime())
@@ -275,12 +254,13 @@ export function parseParams<T extends Record<string, ParamSchema>>(
   for (const [key, spec] of Object.entries(schema)) {
     const raw = params[key];
 
-    if (spec._type === 'optional' && raw === undefined) {
-      continue;
+    if (raw === undefined) {
+      throw new Error(
+        `Missing required path parameter "${key}".`,
+      );
     }
 
-    const parsed = parseValue(spec, raw);
-    result[key] = parsed !== undefined ? parsed : getParamDefault(spec);
+    result[key] = parseValue(spec, raw);
   }
 
   return Object.freeze(result) as InferParamType<T>;
@@ -295,12 +275,13 @@ export function parseParamsRecord(
   for (const [key, spec] of Object.entries(schema)) {
     const raw = params[key];
 
-    if (spec._type === 'optional' && raw === undefined) {
-      continue;
+    if (raw === undefined) {
+      throw new Error(
+        `Missing required path parameter "${key}".`,
+      );
     }
 
-    const parsed = parseValue(spec, raw);
-    result[key] = parsed !== undefined ? parsed : getParamDefault(spec);
+    result[key] = parseValue(spec, raw);
   }
 
   return Object.freeze(result);

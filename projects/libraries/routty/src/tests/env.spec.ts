@@ -48,4 +48,3 @@ describe('test environment helpers', () => {
     expect(true).toBeTrue();
   });
 });
-

@@ -1,4 +1,4 @@
-﻿import {
+import {
   DestroyRef,
   Directive,
   ElementRef,
@@ -49,4 +49,3 @@ export class RouterOutlet implements OnInit {
     );
   }
 }
-

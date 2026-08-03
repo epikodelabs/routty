@@ -1,8 +1,61 @@
-﻿import type {
+import type {
   LayoutDefinition,
   RouteDefinition,
   NavigationTree,
 } from './navigation-definitions';
+
+
+import {
+  compileRoutePath,
+  extractRouteParamNames,
+  joinRoutePath,
+} from './route-path';
+
+function validateCompiledRouteParams(
+  route: RouteDefinition,
+  path: string,
+): void {
+  const paramNames = extractRouteParamNames(path);
+  const seen = new Set<string>();
+
+  for (const name of paramNames) {
+    if (seen.has(name)) {
+      throw new Error(
+        `Duplicate path parameter ":${name}" in compiled route "${path}". ` +
+        'Path parameter names must be unique across the complete layout and route path.',
+      );
+    }
+
+    seen.add(name);
+  }
+
+  const schema = route.paramsSchema;
+  if (!schema) {
+    return;
+  }
+
+  const schemaNames = Object.keys(schema);
+
+  for (const name of schemaNames) {
+    if (!seen.has(name)) {
+      throw new Error(
+        `paramsSchema declares "${name}", but compiled route "${path}" ` +
+        `does not contain ":${name}".`,
+      );
+    }
+  }
+
+  const declared = new Set(schemaNames);
+
+  for (const name of paramNames) {
+    if (!declared.has(name)) {
+      throw new Error(
+        `Compiled route "${path}" contains ":${name}", but paramsSchema ` +
+        `does not declare it. Declare every path parameter when paramsSchema is present.`,
+      );
+    }
+  }
+}
 
 export interface CompiledRoute {
   readonly route: RouteDefinition;
@@ -19,29 +72,7 @@ export interface CompiledRouteGroup {
   readonly outlets: readonly CompiledRoute[];
 }
 
-export function joinRoutePath(
-  parent: string,
-  child: string,
-): string {
-  const parentSegments =
-    parent
-      .split('/')
-      .filter(Boolean);
-
-  const childSegments =
-    child
-      .split('/')
-      .filter(Boolean);
-
-  const joined = [
-    ...parentSegments,
-    ...childSegments,
-  ].join('/');
-
-  return joined
-    ? `/${joined}`
-    : '/';
-}
+export { joinRoutePath } from './route-path';
 
 export function compileRedirect(
   parentPath: string,
@@ -207,15 +238,6 @@ function validateRouteGroups(
   }
 }
 
-function normalizePattern(
-  path: string,
-): string {
-  return path.replace(
-    /:([A-Za-z_][A-Za-z0-9_]*)/g,
-    ':',
-  );
-}
-
 export interface RouteRegistryRecord {
   readonly route: RouteDefinition;
   readonly fullPath: string;
@@ -255,6 +277,8 @@ export function createRouteRegistry(
       path,
     } of groups.flatMap(g => [g.primary, ...g.outlets])
   ) {
+    validateCompiledRouteParams(route, path);
+
     const previous =
       literalPaths.get(path);
 
@@ -267,7 +291,7 @@ export function createRouteRegistry(
     literalPaths.set(path, route);
 
     const pattern =
-      normalizePattern(path);
+      compileRoutePath(path).patternKey;
 
     const previousPattern =
       patterns.get(pattern);
@@ -312,4 +336,3 @@ export function createRouteRegistry(
     groups,
   };
 }
-

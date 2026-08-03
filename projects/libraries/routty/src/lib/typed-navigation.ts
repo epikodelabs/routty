@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   InferParamType,
   InferQueryInputType,
   InferQueryType,
@@ -134,4 +134,3 @@ export type TypedHref<TRoutes extends NavigationTree> = {
     options?: RouteOptionsByName<TRoutes, K>,
   ) => string | null;
 };
-

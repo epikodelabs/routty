@@ -1,4 +1,4 @@
-﻿import { Component, Input } from '@angular/core';
+import { Component, Input } from '@angular/core';
 
 import {
   adaptRouteComponent,
@@ -124,4 +124,3 @@ describe('router adapters', () => {
     expect(routeComponent).toBe(rendered);
   });
 });
-
