@@ -47,7 +47,7 @@ export interface ActivatedRoute<
 
   readonly data: TData;
   readonly historyState: unknown;
-  readonly config: Route;
+  readonly config: RenderableRoute;
 }
 
 export interface NavigationContext<
@@ -120,22 +120,47 @@ export interface LoadedRoute {
   readonly parseQuery?: ParseRouteQuery;
 }
 
-export interface Route {
+export interface RouteBase {
   name?: string;
   path: string;
-  outlet?: string;
   sourceRoute?: unknown;
-  /** Same-path named outlets activated atomically with this primary route. */
-  outlets?: readonly Route[];
-  load?: () => MaybePromise<LoadedRoute>;
-  redirectTo?: string;
   data?: Record<string, unknown>;
+}
+
+export interface RedirectRoute extends RouteBase {
+  readonly kind: 'redirect';
+  readonly redirectTo: string;
+
+  readonly outlet?: never;
+  readonly outlets?: never;
+  readonly load?: never;
+  readonly preload?: never;
+  readonly viewTransition?: never;
+  readonly canActivate?: never;
+  readonly canDeactivate?: never;
+  readonly prepare?: never;
+}
+
+export interface RenderableRoute extends RouteBase {
+  /**
+   * Optional for compatibility with direct createRouter() route records.
+   * Adapter-generated renderable routes always set kind to "route".
+   */
+  readonly kind?: 'route';
+  outlet?: string;
+  /** Same-path named outlets activated atomically with this primary route. */
+  outlets?: readonly RenderableRoute[];
+  load?: () => MaybePromise<LoadedRoute>;
   preload?: boolean;
   viewTransition?: boolean;
   canActivate?: CanActivateFn[];
   canDeactivate?: CanDeactivateFn[];
   prepare?: readonly PrepareRouteDataFn[];
+
+  readonly redirectTo?: never;
 }
+
+export type Route = RedirectRoute | RenderableRoute;
 
 export interface NavigationTransition {
   readonly from: ActivatedRoute | null;
@@ -517,9 +542,6 @@ function validateRouteGroups(routes: readonly Route[]): void {
       if (outlet.outlets?.length) {
         throw new Error(`Outlet "${name}" cannot contain nested outlets`);
       }
-      if (outlet.redirectTo) {
-        throw new Error(`Outlet "${name}" cannot redirect`);
-      }
       if (outlet.name) {
         throw new Error(`Outlet "${name}" cannot define a route name`);
       }
@@ -535,7 +557,7 @@ function validateRouteGroups(routes: readonly Route[]): void {
       }
     }
 
-    if (primary.redirectTo && outletNames.size > 0) {
+    if (primary.kind === 'redirect' && outletNames.size > 0) {
       throw new Error(
         `Redirect route "${primary.path}" cannot activate named outlets`,
       );
@@ -543,10 +565,10 @@ function validateRouteGroups(routes: readonly Route[]): void {
   }
 }
 
-const routeLoads = new WeakMap<Route, Promise<LoadedRoute>>();
+const routeLoads = new WeakMap<RenderableRoute, Promise<LoadedRoute>>();
 
 function loadRoute(
-  route: Route,
+  route: RenderableRoute,
 ): Promise<LoadedRoute> {
   let pending = routeLoads.get(route);
 
@@ -711,7 +733,10 @@ export function createRouter(config: RouterConfig): Router {
       query: readRawQuery(url),
       data: EMPTY_DATA,
       historyState: decodeHistoryState(browserWindow?.history.state ?? null),
-      config: config.routes[0] ?? { path: '**' },
+      config:
+        config.routes.find(
+          (route): route is RenderableRoute => route.kind !== 'redirect',
+        ) ?? { path: '**' },
     };
   }
 
@@ -1059,11 +1084,14 @@ export function createRouter(config: RouterConfig): Router {
     }
 
     for (const route of config.routes) {
-      if (route.preload === false) {
+      if (route.kind === 'redirect' || route.preload === false) {
         continue;
       }
 
-      const group = [route, ...(route.outlets ?? [])];
+      const group: readonly RenderableRoute[] = [
+        route,
+        ...(route.outlets ?? []),
+      ];
       for (const member of group) {
         try {
           const loaded = await loadRoute(member);
@@ -1249,17 +1277,24 @@ export function createRouter(config: RouterConfig): Router {
     }
 
     const primaryRoute = match.route;
-    const routes = [primaryRoute, ...(primaryRoute.outlets ?? [])];
-    const historyState = request.historyUpdate.nextEntry?.state ?? null;
 
-    if (primaryRoute.redirectTo) {
+    if (primaryRoute.kind === 'redirect') {
       return {
         type: 'redirect',
         request,
-        redirectTo: interpolateRedirect(primaryRoute.redirectTo, match.params),
+        redirectTo: interpolateRedirect(
+          primaryRoute.redirectTo,
+          match.params,
+        ),
         replace: true,
       };
     }
+
+    const routes: readonly RenderableRoute[] = [
+      primaryRoute,
+      ...(primaryRoute.outlets ?? []),
+    ];
+    const historyState = request.historyUpdate.nextEntry?.state ?? null;
 
     let loadedRoutes: LoadedRoute[];
     try {

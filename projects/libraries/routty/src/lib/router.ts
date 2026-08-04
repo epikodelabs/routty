@@ -29,6 +29,7 @@ import type {
   FrameView,
   LayoutDefinition,
   LayoutOptions,
+  RedirectRouteDefinition,
   RenderableRoute,
   RouteDefinition,
   RouteOptions,
@@ -62,6 +63,8 @@ import {
   type NavigationTransitionDefinition,
   type PrepareRouteDataFn,
   type PreloadingStrategy,
+  type RedirectRoute,
+  type RenderableRoute as RuntimeRenderableRoute,
   type Route,
   type RouteRenderContext,
   type Router as VanillaRouter,
@@ -334,6 +337,33 @@ async function resolveViews(
 }
 
 function adaptRoute(
+  route: RedirectRouteDefinition,
+  path: string,
+  redirectTo: string | undefined,
+  layouts: readonly LayoutDefinition[],
+  sharedPreparers: readonly PrepareRouteDataFn[] | undefined,
+  appRef: ApplicationRef,
+  injector: EnvironmentInjector,
+): RedirectRoute;
+function adaptRoute(
+  route: RenderableRoute,
+  path: string,
+  redirectTo: string | undefined,
+  layouts: readonly LayoutDefinition[],
+  sharedPreparers: readonly PrepareRouteDataFn[] | undefined,
+  appRef: ApplicationRef,
+  injector: EnvironmentInjector,
+): RuntimeRenderableRoute;
+function adaptRoute(
+  route: RouteDefinition,
+  path: string,
+  redirectTo: string | undefined,
+  layouts: readonly LayoutDefinition[],
+  sharedPreparers: readonly PrepareRouteDataFn[] | undefined,
+  appRef: ApplicationRef,
+  injector: EnvironmentInjector,
+): Route;
+function adaptRoute(
   route: RouteDefinition,
   path: string,
   redirectTo: string | undefined,
@@ -344,6 +374,7 @@ function adaptRoute(
 ): Route {
   if (route.kind === 'redirect') {
     return {
+      kind: 'redirect',
       name: route.name,
       path,
       sourceRoute: route,
@@ -358,6 +389,7 @@ function adaptRoute(
   } as const;
 
   return {
+    kind: 'route',
     name: route.name,
     path,
     outlet: route.outlet,
@@ -394,7 +426,9 @@ function adaptRoutes(
 ): Route[] {
   return groups.map((group: CompiledRouteGroup) => {
     const sharedPreparers = adaptFramePreparers(
-      group.layouts.map((layout) => layout.frame).filter((frame): frame is FrameView => !!frame),
+      group.layouts
+        .map((layout) => layout.frame)
+        .filter((frame): frame is FrameView => !!frame),
       injector,
     );
 
@@ -408,8 +442,18 @@ function adaptRoutes(
       injector,
     );
 
-    const outlets = group.outlets.map((compiled: CompiledRoute) =>
-      adaptRoute(
+    if (primary.kind === 'redirect') {
+      return primary;
+    }
+
+    const outlets = group.outlets.map((compiled: CompiledRoute) => {
+      if (compiled.route.kind === 'redirect') {
+        throw new Error(
+          `Named outlet route "${compiled.path}" cannot be a redirect.`,
+        );
+      }
+
+      return adaptRoute(
         compiled.route,
         group.path,
         compiled.redirectTo,
@@ -417,10 +461,15 @@ function adaptRoutes(
         sharedPreparers,
         appRef,
         injector,
-      ),
-    );
+      );
+    });
 
-    return outlets.length > 0 ? { ...primary, outlets: Object.freeze(outlets) } : primary;
+    return outlets.length > 0
+      ? {
+          ...primary,
+          outlets: Object.freeze(outlets),
+        }
+      : primary;
   });
 }
 
