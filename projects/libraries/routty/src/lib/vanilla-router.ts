@@ -229,6 +229,7 @@ export interface Router {
   dispose(): void;
   navigate(target: string | URL, options?: NavigationOptions): Promise<boolean>;
   replace(target: string | URL, state?: unknown): Promise<boolean>;
+  revalidate(): Promise<boolean>;
   updateHistoryState(state: unknown): void;
   preload(): Promise<void>;
   back(): void;
@@ -1991,6 +1992,38 @@ export function createRouter(config: RouterConfig): Router {
     return navigate(target, { replace: true, state });
   }
 
+  function revalidate(): Promise<boolean> {
+    if (disposed) {
+      throw new Error('Cannot revalidate with a disposed router');
+    }
+
+    const location = routerLocation();
+    const url = new URL(location.href);
+
+    if (url.origin !== location.origin) {
+      return requestExternalNavigation(
+        url,
+        undefined,
+        history.createDefaultUpdate(),
+      );
+    }
+
+    if (!isInsideBase(url.pathname)) {
+      throw new Error(
+        `URL "${url.pathname}" is outside router base "${baseHref}"`,
+      );
+    }
+
+    // Revalidation bypasses same-URL suppression and performs a complete
+    // navigation transaction without mutating browser history.
+    return requestNavigation(
+      url,
+      0,
+      undefined,
+      history.createDefaultUpdate(),
+    );
+  }
+
   function startRouter(): void {
     if (disposed) {
       throw new Error(
@@ -2148,6 +2181,7 @@ export function createRouter(config: RouterConfig): Router {
     },
     navigate: (target, options) => navigate(target, options),
     replace: (target, state) => replace(target, state),
+    revalidate: () => revalidate(),
     updateHistoryState: (state) => updateHistoryState(state),
     preload: () => preload(),
     back: () => browserWindow?.history.back(),

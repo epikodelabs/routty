@@ -1,4 +1,4 @@
-﻿import {
+import {
   Component,
   inject,
   input,
@@ -165,7 +165,7 @@ const sidebarStyles = `
       <h1>Manual route scenario harness</h1>
       <p class="lede">
         This app is meant for real browser checks, not framework smoke tests.
-        Use it to validate how Routty handles redirects, typed params,
+        Use it to validate how Waypoint handles redirects, typed params,
         query defaults, lazy routes, frame hooks, and grouped named outlets.
       </p>
 
@@ -417,8 +417,12 @@ export class IntroPage {
     return this.session.currentUser();
   }
 
-  protected activateUser(userId: string): void {
+  protected async activateUser(userId: string): Promise<void> {
     this.session.loginAs(userId);
+
+    await this.router.navigate({
+      name: 'admin',
+    });
   }
 
   protected openWorkspace(
@@ -658,6 +662,7 @@ export class IntroPage {
 })
 export class DemoShellComponent {
   protected readonly session = inject(DemoSessionService);
+  private readonly router = inject(Router);
   protected readonly users = this.session.users;
 
   protected currentUser(): DemoUser {
@@ -715,8 +720,12 @@ export class DemoShellComponent {
     ] as const;
   }
 
-  protected activateUser(userId: string): void {
+  protected async activateUser(userId: string): Promise<void> {
     this.session.loginAs(userId);
+
+    await this.router.navigate({
+      name: 'admin',
+    });
   }
 
   protected setAdminAccess(event: Event): void {
@@ -798,8 +807,8 @@ export class DemoShellComponent {
             <strong>#{{ snapshot()?.recommendedDraftId ?? 0 }}</strong>
           </p>
           <p>
-            Switching the signed-in demo user updates workspace defaults,
-            editor drafts, and admin review metadata without rebuilding the app.
+            Switching the signed-in demo user attempts the admin route.
+            Nora is redirected to access settings, while Lev enters admin.
           </p>
         </article>
       </div>
@@ -1182,4 +1191,3 @@ export class AdminSidebarComponent {}
   styles: [sidebarStyles],
 })
 export class ReportsSidebarComponent {}
-
