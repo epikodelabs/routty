@@ -1,4 +1,4 @@
-import { HistoryManager, ZERO_SCROLL, type HistoryEntry, type HistoryUpdate, type ScrollPosition } from './history';
+import { decodeHistoryState, encodeHistoryState, HistoryManager, ZERO_SCROLL, type HistoryEntry, type HistoryUpdate, type ScrollPosition } from './history';
 import { dispatchRouterLocationChange } from './router-events';
 import {
   compileRoutePath,
@@ -710,7 +710,7 @@ export function createRouter(config: RouterConfig): Router {
       params: EMPTY_PARAMS,
       query: readRawQuery(url),
       data: EMPTY_DATA,
-      historyState: browserWindow?.history.state ?? null,
+      historyState: decodeHistoryState(browserWindow?.history.state ?? null),
       config: config.routes[0] ?? { path: '**' },
     };
   }
@@ -849,16 +849,18 @@ export function createRouter(config: RouterConfig): Router {
     const entry = history.createDefaultUpdate().previousEntry ?? {
       href: currentHref(),
       scroll: readScroll(),
+      id: 0,
       state: null,
     };
     const nextEntry: HistoryEntry = {
+      id: entry.id,
       href: entry.href,
       scroll: readScroll(),
       state: state ?? null,
     };
 
     browserWindow?.history.replaceState(
-        nextEntry.state,
+        encodeHistoryState(nextEntry),
         '',
         nextEntry.href,
       );
@@ -1577,7 +1579,7 @@ export function createRouter(config: RouterConfig): Router {
           redirectUrl.hash;
 
         const historyState =
-          browserWindow?.history.state ?? null;
+          decodeHistoryState(browserWindow?.history.state ?? null);
 
         const historyUpdate =
           history.createUpdate(
@@ -1591,7 +1593,7 @@ export function createRouter(config: RouterConfig): Router {
               ? 'replaceState'
               : 'pushState'
           ](
-            historyState,
+            encodeHistoryState(historyUpdate.nextEntry!),
             '',
             href,
           );
@@ -1778,7 +1780,7 @@ export function createRouter(config: RouterConfig): Router {
         }
 
         const href = url.pathname + url.search + url.hash;
-        const historyState = browserWindow?.history.state ?? null;
+        const historyState = decodeHistoryState(browserWindow?.history.state ?? null);
         const historyUpdate = history.createUpdate(href, result.replace, historyState);
         browserWindow?.history[result.replace ? 'replaceState' : 'pushState'](historyState, '', href);
         dispatchRouterLocationChange();
@@ -1945,7 +1947,7 @@ export function createRouter(config: RouterConfig): Router {
     const href = url.pathname + url.search + url.hash;
     const historyState = options.state ?? null;
     const historyUpdate = history.createUpdate(href, options.replace ?? false, historyState);
-    browserWindow?.history[options.replace ? 'replaceState' : 'pushState'](historyState, '', href);
+    browserWindow?.history[options.replace ? 'replaceState' : 'pushState'](encodeHistoryState(historyUpdate.nextEntry!), '', href);
     dispatchRouterLocationChange();
     return requestNavigation(url, 0, undefined, historyUpdate);
   }
@@ -1966,6 +1968,16 @@ export function createRouter(config: RouterConfig): Router {
     }
 
     started = true;
+
+    const initialHistoryEntry = history.createDefaultUpdate().previousEntry;
+    if (initialHistoryEntry) {
+      browserWindow?.history.replaceState(
+        encodeHistoryState(initialHistoryEntry),
+        '',
+        initialHistoryEntry.href,
+      );
+    }
+
     browserWindow?.addEventListener(
         'popstate',
         handlePopState,

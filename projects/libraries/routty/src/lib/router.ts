@@ -250,7 +250,7 @@ function adaptFrameTransitions(
   for (const group of groups) {
     const primaryRoute = group.primary.route;
 
-    if (primaryRoute.redirectTo) {
+    if (primaryRoute.kind === 'redirect') {
       continue;
     }
 
@@ -288,7 +288,7 @@ function adaptFrameTransitions(
 }
 
 function adaptParamsParser(
-  route: RouteDefinition,
+  route: RenderableRoute,
   injector: EnvironmentInjector,
 ): LoadedRoute['parseParams'] {
   const schema = route.paramsSchema;
@@ -299,7 +299,7 @@ function adaptParamsParser(
 }
 
 function adaptQueryParser(
-  route: RouteDefinition,
+  route: RenderableRoute,
   injector: EnvironmentInjector,
 ): LoadedRoute['parseQuery'] {
   const schema = route.querySchema;
@@ -342,28 +342,32 @@ function adaptRoute(
   appRef: ApplicationRef,
   injector: EnvironmentInjector,
 ): Route {
+  if (route.kind === 'redirect') {
+    return {
+      name: route.name,
+      path,
+      sourceRoute: route,
+      redirectTo: redirectTo ?? route.redirectTo,
+      data: route.data,
+    };
+  }
+
   const tokens = {
     routeToken: ROUTE,
     contextToken: ROUTE_CONTEXT,
   } as const;
-  const renderableRoute = redirectTo ? null : (route as RenderableRoute);
 
   return {
     name: route.name,
     path,
     outlet: route.outlet,
     sourceRoute: route,
-    redirectTo,
     data: route.data,
     preload: route.preload,
     viewTransition: route.viewTransition,
 
     load: async () => {
-      if (redirectTo) {
-        return {};
-      }
-
-      const views = await resolveViews(layouts, renderableRoute!);
+      const views = await resolveViews(layouts, route);
 
       return {
         component: route.outlet
@@ -372,7 +376,7 @@ function adaptRoute(
         prepare: [
           ...(sharedPreparers ?? []),
           ...(adaptFramePreparers(
-            renderableRoute?.frame ? [renderableRoute.frame] : [],
+            route.frame ? [route.frame] : [],
             injector,
           ) ?? []),
         ],
@@ -446,7 +450,7 @@ function replaceChildNodes(
 function interpolateNamedPath(
   template: string,
   params: Readonly<Record<string, unknown>>,
-  schema: RouteDefinition['paramsSchema'],
+  schema: ParamSchemaRecord | undefined,
 ): string | null {
   const serialized = schema
     ? serializeParams(schema, params as unknown as InferParamType<ParamSchemaRecord>)
@@ -745,7 +749,7 @@ export class Router<TRoutes extends NavigationTree = any> {
     const path = interpolateNamedPath(
       record.fullPath,
       target.params ?? {},
-      record.route.paramsSchema,
+      record.route.kind === 'route' ? record.route.paramsSchema : undefined,
     );
 
     if (!path) {
@@ -753,7 +757,7 @@ export class Router<TRoutes extends NavigationTree = any> {
     }
 
     const query =
-      record.route.querySchema && target.query
+      record.route.kind === 'route' && record.route.querySchema && target.query
         ? serializeQuery(record.route.querySchema, target.query)
         : '';
 

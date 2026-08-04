@@ -226,7 +226,7 @@ export function redirectRoute<
   > = {},
 ): RedirectRouteDefinition<TPath, TName> {
   return {
-    kind: 'route',
+    kind: 'redirect',
     path,
     redirectTo,
     ...options,

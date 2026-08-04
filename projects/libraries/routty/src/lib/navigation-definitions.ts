@@ -143,8 +143,13 @@ export type RouteOptions<
 export interface RedirectRouteDefinition<
   TPath extends string = string,
   TName extends string | undefined = string | undefined,
-> extends RouteDefinitionBase<TPath, TName, undefined, undefined> {
+> {
+  readonly kind: 'redirect';
+  readonly path: TPath;
+  readonly name?: TName;
   readonly redirectTo: string;
+  readonly data?: Readonly<Record<string, unknown>>;
+  readonly providers?: NavigationProviders;
 }
 
 export type RenderableRoute<
@@ -156,7 +161,6 @@ export type RenderableRoute<
 > = RouteDefinitionBase<TPath, TName, TParamsSchema, TQuerySchema> &
   ViewDefinition & {
     readonly frame?: TFrame;
-    readonly redirectTo?: undefined;
   };
 
 export type RouteDefinition<
