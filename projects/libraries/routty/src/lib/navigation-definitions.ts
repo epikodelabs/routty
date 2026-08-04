@@ -1,5 +1,6 @@
 import type { EnvironmentProviders, Provider, Type } from '@angular/core';
-import type { ParamSchemaRecord, QuerySchemaRecord } from './query-schema';
+import type { ParamSchema, ParamSchemaRecord, QuerySchemaRecord } from './query-schema';
+import type { ExtractPathParams } from './route-path';
 import type {
   ActivatedRoute,
   CanActivateFn as RouterCanActivateFn,
@@ -122,12 +123,20 @@ export interface RouteDefinitionBase<
   readonly providers?: NavigationProviders;
 }
 
+export type ParamsSchemaForPath<TPath extends string> =
+  [ExtractPathParams<TPath>] extends [never]
+    ? never
+    : Readonly<{
+        [TKey in ExtractPathParams<TPath>]: ParamSchema;
+      }>;
+
 export type RouteOptions<
+  TPath extends string = string,
   TName extends string | undefined = string | undefined,
   TParamsSchema extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
   TQuerySchema extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
 > = Omit<
-  RouteDefinitionBase<string, TName, TParamsSchema, TQuerySchema>,
+  RouteDefinitionBase<TPath, TName, TParamsSchema, TQuerySchema>,
   'kind' | 'path'
 >;
 

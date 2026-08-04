@@ -8,16 +8,9 @@ import type {
 import type {
   RouteDefinition, NavigationTree
 } from './navigation-definitions';
+import type { ExtractPathParams } from './route-path';
 
-/**
- * Extracts named parameter tokens from path string templates (e.g. "/users/:id")
- */
-export type ExtractPathParams<T extends string> =
-  T extends `${string}:${infer Param}/${infer Rest}`
-    ? Param | ExtractPathParams<`/${Rest}`>
-    : T extends `${string}:${infer Param}`
-    ? Param
-    : never;
+export type { ExtractPathParams } from './route-path';
 
 /**
  * Recursively flattens all routes and layout entries into a union of leaf routes.
@@ -54,7 +47,7 @@ export type InferRouteParams<TRoute> =
       ? InferParamType<TParamsSchema>
       : [ExtractPathParams<TPath>] extends [never]
         ? Record<string, never>
-        : Record<ExtractPathParams<TPath>, string | number>
+        : Readonly<Record<ExtractPathParams<TPath>, string>>
     : Record<string, unknown>;
 
 /**

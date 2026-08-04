@@ -1,3 +1,10 @@
+export type ExtractPathParams<TPath extends string> =
+  TPath extends `${string}:${infer TParam}/${infer TRest}`
+    ? TParam | ExtractPathParams<`/${TRest}`>
+    : TPath extends `${string}:${infer TParam}`
+      ? TParam
+      : never;
+
 export type RoutePathSegment =
   | {
       readonly kind: 'literal';

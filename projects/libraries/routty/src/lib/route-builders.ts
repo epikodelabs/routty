@@ -1,6 +1,6 @@
 import type { Type } from '@angular/core';
 
-import type { ParamSchemaRecord, QuerySchemaRecord } from './query-schema';
+import type { QuerySchemaRecord } from './query-schema';
 import type {
   FrameHooks,
   FramePrepareFn,
@@ -10,6 +10,7 @@ import type {
   LayoutOptions,
   Lazy,
   NavigationTree,
+  ParamsSchemaForPath,
   RedirectRouteDefinition,
   RenderableRoute,
   RouteOptions,
@@ -121,33 +122,33 @@ export function lazyFrame<
 export function route<
   const TPath extends string,
   const TName extends string | undefined = undefined,
-  const TParamsSchema extends ParamSchemaRecord | undefined = undefined,
+  const TParamsSchema extends ParamsSchemaForPath<TPath> | undefined = undefined,
   const TQuerySchema extends QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
   component: Type<unknown>,
-  options?: RouteOptions<TName, TParamsSchema, TQuerySchema>,
+  options?: RouteOptions<TPath, TName, TParamsSchema, TQuerySchema>,
 ): RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema, undefined>;
 export function route<
   const TPath extends string,
   const TFrame extends FrameView<any>,
   const TName extends string | undefined = undefined,
-  const TParamsSchema extends ParamSchemaRecord | undefined = undefined,
+  const TParamsSchema extends ParamsSchemaForPath<TPath> | undefined = undefined,
   const TQuerySchema extends QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
   component: TFrame,
-  options?: RouteOptions<TName, TParamsSchema, TQuerySchema>,
+  options?: RouteOptions<TPath, TName, TParamsSchema, TQuerySchema>,
 ): RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema, TFrame>;
 export function route<
   const TPath extends string,
   const TName extends string | undefined = undefined,
-  const TParamsSchema extends ParamSchemaRecord | undefined = undefined,
+  const TParamsSchema extends ParamsSchemaForPath<TPath> | undefined = undefined,
   const TQuerySchema extends QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
   component: Type<unknown> | FrameView<any>,
-  options: RouteOptions<TName, TParamsSchema, TQuerySchema> = {},
+  options: RouteOptions<TPath, TName, TParamsSchema, TQuerySchema> = {},
 ): RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema> {
   return {
     kind: 'route',
@@ -160,33 +161,33 @@ export function route<
 export function lazyRoute<
   const TPath extends string,
   const TName extends string | undefined = undefined,
-  const TParamsSchema extends ParamSchemaRecord | undefined = undefined,
+  const TParamsSchema extends ParamsSchemaForPath<TPath> | undefined = undefined,
   const TQuerySchema extends QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
   loadComponent: Lazy<Type<unknown>>,
-  options?: RouteOptions<TName, TParamsSchema, TQuerySchema>,
+  options?: RouteOptions<TPath, TName, TParamsSchema, TQuerySchema>,
 ): RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema, undefined>;
 export function lazyRoute<
   const TPath extends string,
   const TFrame extends FrameView<any>,
   const TName extends string | undefined = undefined,
-  const TParamsSchema extends ParamSchemaRecord | undefined = undefined,
+  const TParamsSchema extends ParamsSchemaForPath<TPath> | undefined = undefined,
   const TQuerySchema extends QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
   loadComponent: TFrame,
-  options?: RouteOptions<TName, TParamsSchema, TQuerySchema>,
+  options?: RouteOptions<TPath, TName, TParamsSchema, TQuerySchema>,
 ): RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema, TFrame>;
 export function lazyRoute<
   const TPath extends string,
   const TName extends string | undefined = undefined,
-  const TParamsSchema extends ParamSchemaRecord | undefined = undefined,
+  const TParamsSchema extends ParamsSchemaForPath<TPath> | undefined = undefined,
   const TQuerySchema extends QuerySchemaRecord | undefined = undefined,
 >(
   path: TPath,
   loadComponent: Lazy<Type<unknown>> | FrameView<any>,
-  options: RouteOptions<TName, TParamsSchema, TQuerySchema> = {},
+  options: RouteOptions<TPath, TName, TParamsSchema, TQuerySchema> = {},
 ): RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema> {
   return {
     kind: 'route',
@@ -204,7 +205,7 @@ export function redirectRoute<
   path: TPath,
   redirectTo: TRedirectTo,
   options: Omit<
-    RouteOptions<TName, undefined, undefined>,
+    RouteOptions<TPath, TName, undefined, undefined>,
     'redirectTo' | 'paramsSchema' | 'querySchema' | 'outlet'
   > = {},
 ): RedirectRouteDefinition<TPath, TName> {

@@ -9,6 +9,7 @@ import {
 class DashboardLayout {}
 class DashboardPage {}
 class SettingsPage {}
+class AuditPage {}
 
 const dashboardRoute = route('/dashboard/:projectId', DashboardPage, {
   name: 'dashboard',
@@ -23,6 +24,10 @@ const dashboardRoute = route('/dashboard/:projectId', DashboardPage, {
   },
 });
 
+const auditRoute = route('/audit/:entryId', AuditPage, {
+  name: 'audit',
+});
+
 const settingsRoute = route('/settings', SettingsPage, {
   name: 'settings',
   querySchema: {
@@ -33,6 +38,7 @@ const settingsRoute = route('/settings', SettingsPage, {
 const routes = [
   layout('/app', DashboardLayout, [
     settingsRoute,
+    auditRoute,
     dashboardRoute,
   ]),
 ] as const satisfies NavigationTree;
@@ -51,6 +57,16 @@ function assertNamedNavigation(router: Router<typeof routes>): void {
       draft: true,
     },
   });
+
+  void router.navigateTo.audit({
+    params: { entryId: 'evt-42' },
+  });
+
+  // @ts-expect-error schema-less path parameters remain strings
+  void router.navigateTo.audit({ params: { entryId: 42 } });
+
+  // @ts-expect-error literal path requires entryId
+  void router.navigateTo.audit({ params: {} });
 
   void router.navigateTo.settings({
     query: { section: 'billing' },
@@ -72,4 +88,19 @@ describe('typed routes typings', () => {
   it('discovers named leaf routes nested inside layouts', () => {
     expect(typeof assertNamedNavigation).toBe('function');
   });
+});
+
+// @ts-expect-error paramsSchema keys must come from the literal route path
+route('/users/:userId', DashboardPage, {
+  paramsSchema: { accountId: s.number() },
+});
+
+// @ts-expect-error paramsSchema must declare every literal path parameter
+route('/teams/:teamId/users/:userId', DashboardPage, {
+  paramsSchema: { teamId: s.number() },
+});
+
+// @ts-expect-error routes without path parameters cannot declare paramsSchema
+route('/health', DashboardPage, {
+  paramsSchema: { id: s.string() },
 });
