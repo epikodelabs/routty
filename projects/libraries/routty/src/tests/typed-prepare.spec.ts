@@ -3,10 +3,12 @@ import type { Type } from '@angular/core';
 import {
   frame,
   lazyFrame,
+  layout,
   route,
 } from '../lib/route-builders';
 import type {
   InferFrameData,
+  InferNavigationPreparedData,
   InferRoutePreparedData,
 } from '../lib/navigation-definitions';
 
@@ -18,6 +20,15 @@ interface Project {
 }
 
 describe('typed frame preparation', () => {
+  it('contextually types prepare callback context', () => {
+    frame(ProjectPage, {
+      prepare: [context => ({
+        preparedUrl: context.url.href,
+        aborted: context.signal.aborted,
+      })],
+    });
+  });
+
   it('preserves prepare handlers at runtime', async () => {
     const project: Project = {
       id: 7,
@@ -98,3 +109,42 @@ const frameData: ProjectFrameData = {
 
 const routeData: ProjectRouteData = frameData;
 void routeData;
+const applicationRoutes = [
+  layout('/app', frame(ProjectPage, {
+    prepare: [
+      () => ({ session: { userId: 17 } }),
+      () => ({ featureFlags: ['projects'] as const }),
+    ],
+  }), [
+    route('/projects/:projectId', frame(ProjectPage, {
+      prepare: [
+        () => ({ project }),
+      ],
+    }), {
+      name: 'applicationProject',
+      data: {
+        section: 'projects' as const,
+      },
+    }),
+  ]),
+] as const;
+
+
+type ApplicationProjectData = InferNavigationPreparedData<
+  typeof applicationRoutes,
+  'applicationProject'
+>;
+
+const applicationProjectData: ApplicationProjectData = {
+  session: { userId: 17 },
+  featureFlags: ['projects'],
+  project,
+};
+
+void applicationProjectData;
+
+// @ts-expect-error unknown route names do not expose arbitrary data
+const missingRouteData: InferNavigationPreparedData<typeof applicationRoutes, 'missing'> = {
+  project,
+};
+void missingRouteData;

@@ -176,6 +176,66 @@ export type InferRoutePreparedData<TRoute> =
       : Readonly<Record<string, never>>
     : Readonly<Record<string, never>>;
 
+
+
+type EmptyRouteData = Readonly<Record<string, never>>;
+
+type NormalizePreparedData<TData> =
+  string extends keyof TData ? Readonly<{}> : TData;
+
+type MergePreparedData<TLeft, TRight> = Simplify<
+  NormalizePreparedData<TLeft> & NormalizePreparedData<TRight>
+>;
+
+type InferLayoutPreparedData<TLayout> =
+  TLayout extends LayoutDefinition<any, any, infer TFrame>
+    ? TFrame extends FrameView<any>
+      ? InferFrameData<TFrame>
+      : EmptyRouteData
+    : EmptyRouteData;
+
+type RouteNameMatches<TRoute, TName extends string> =
+  TRoute extends { readonly name?: infer TRouteName }
+    ? TRouteName extends TName
+      ? true
+      : false
+    : false;
+
+type InferNavigationPreparedDataFromEntry<
+  TEntry,
+  TName extends string,
+  TInherited extends RouteData,
+> = TEntry extends LayoutDefinition<any, infer TEntries, any>
+  ? InferNavigationPreparedDataFromTree<
+      TEntries,
+      TName,
+      MergePreparedData<TInherited, InferLayoutPreparedData<TEntry>>
+    >
+  : TEntry extends RouteDefinition
+    ? RouteNameMatches<TEntry, TName> extends true
+      ? MergePreparedData<TInherited, InferRoutePreparedData<TEntry>>
+      : never
+    : never;
+
+type InferNavigationPreparedDataFromTree<
+  TTree,
+  TName extends string,
+  TInherited extends RouteData,
+> = TTree extends readonly unknown[]
+  ? InferNavigationPreparedDataFromEntry<TTree[number], TName, TInherited>
+  : never;
+
+/**
+ * Infers all data returned by prepare handlers for a named route, including
+ * every parent layout frame and the route frame itself.
+ */
+export type InferNavigationPreparedData<
+  TTree extends NavigationTree,
+  TName extends string,
+> = [InferNavigationPreparedDataFromTree<TTree, TName, EmptyRouteData>] extends [never]
+  ? never
+  : InferNavigationPreparedDataFromTree<TTree, TName, EmptyRouteData>;
+
 export interface LayoutDefinitionBase<
   TPath extends string = string,
   TEntries extends NavigationTree = NavigationTree,

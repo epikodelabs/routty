@@ -94,11 +94,19 @@ function createLazyViewRecord(
 }
 
 export function frame<
-  const TPrepare extends readonly FramePrepareFn[] | undefined = undefined,
+  const TPrepare extends readonly FramePrepareFn[],
 >(
   component: Type<unknown>,
-  hooks: FrameHooks<TPrepare> = {} as FrameHooks<TPrepare>,
-): FrameView<InferPreparedData<TPrepare>> {
+  hooks: FrameHooks<TPrepare> & { readonly prepare: TPrepare },
+): FrameView<InferPreparedData<TPrepare>>;
+export function frame(
+  component: Type<unknown>,
+  hooks?: FrameHooks<undefined>,
+): FrameView<Readonly<Record<string, never>>>;
+export function frame(
+  component: Type<unknown>,
+  hooks: FrameHooks<readonly FramePrepareFn[] | undefined> = {},
+): FrameView {
   return {
     kind: 'frame',
     component,
@@ -107,11 +115,19 @@ export function frame<
 }
 
 export function lazyFrame<
-  const TPrepare extends readonly FramePrepareFn[] | undefined = undefined,
+  const TPrepare extends readonly FramePrepareFn[],
 >(
   loadComponent: Lazy<Type<unknown>>,
-  hooks: FrameHooks<TPrepare> = {} as FrameHooks<TPrepare>,
-): FrameView<InferPreparedData<TPrepare>> {
+  hooks: FrameHooks<TPrepare> & { readonly prepare: TPrepare },
+): FrameView<InferPreparedData<TPrepare>>;
+export function lazyFrame(
+  loadComponent: Lazy<Type<unknown>>,
+  hooks?: FrameHooks<undefined>,
+): FrameView<Readonly<Record<string, never>>>;
+export function lazyFrame(
+  loadComponent: Lazy<Type<unknown>>,
+  hooks: FrameHooks<readonly FramePrepareFn[] | undefined> = {},
+): FrameView {
   return {
     kind: 'frame',
     loadComponent,
