@@ -105,8 +105,8 @@ export function frame(
 ): FrameView<Readonly<Record<string, never>>>;
 export function frame(
   component: Type<unknown>,
-  hooks: FrameHooks<readonly FramePrepareFn[] | undefined> = {},
-): FrameView {
+  hooks: FrameHooks<any> = {},
+): FrameView<any> {
   return {
     kind: 'frame',
     component,
@@ -126,8 +126,8 @@ export function lazyFrame(
 ): FrameView<Readonly<Record<string, never>>>;
 export function lazyFrame(
   loadComponent: Lazy<Type<unknown>>,
-  hooks: FrameHooks<readonly FramePrepareFn[] | undefined> = {},
-): FrameView {
+  hooks: FrameHooks<any> = {},
+): FrameView<any> {
   return {
     kind: 'frame',
     loadComponent,
