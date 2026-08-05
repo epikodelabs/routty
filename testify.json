@@ -21,13 +21,6 @@
     "preserveModules": false,
     "preserveModulesRoot": "."
   },
-  "viteConfig": {
-    "resolve": {
-      "alias": {
-        "@epikodelabs/routty": "./dist/routty/fesm2022/epikodelabs-routty.mjs"
-      }
-    }
-  },
   "jasmineConfig": {
     "env": {
       "stopSpecOnExpectationFailure": false,
