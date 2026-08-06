@@ -37,6 +37,7 @@ import type {
 } from './navigation-definitions';
 
 import type { TypedHref, TypedNavigate } from './typed-navigation';
+import type { RouteRuntime } from './route-runtime';
 
 import { OUTLET_ACTIVATE_EVENT, dispatchOutletLifecycleEvent } from './router-events';
 
@@ -52,7 +53,6 @@ import {
 } from './query-schema';
 
 import {
-  LoadedRoute,
   type CanActivateFn,
   type CanDeactivateFn,
   createRouter,
@@ -293,7 +293,7 @@ function adaptFrameTransitions(
 function adaptParamsParser(
   route: RenderableRoute,
   injector: EnvironmentInjector,
-): LoadedRoute['parseParams'] {
+): RouteRuntime['parseParams'] {
   const schema = route.paramsSchema;
   if (!schema) return undefined;
 
@@ -304,7 +304,7 @@ function adaptParamsParser(
 function adaptQueryParser(
   route: RenderableRoute,
   injector: EnvironmentInjector,
-): LoadedRoute['parseQuery'] {
+): RouteRuntime['parseQuery'] {
   const schema = route.querySchema;
   if (!schema) return undefined;
 

@@ -1,11 +1,31 @@
 import { decodeHistoryState, encodeHistoryState, HistoryManager, ZERO_SCROLL, type HistoryEntry, type HistoryUpdate, type ScrollPosition } from './history';
 import { dispatchRouterLocationChange } from './router-events';
 import {
-  compileRoutePath,
-  matchRoutePath,
-  splitRoutePath,
-  type CompiledRoutePath,
-} from './route-path';
+  appendCatalogRoutes,
+  createRouteCatalog,
+  readCatalogRoutes,
+  removeCatalogRoutes,
+  replaceCatalogRoutes,
+  type RouteCatalog,
+} from './route-catalog';
+import {
+  commitNavigation,
+} from './navigation-commit';
+import {
+  preloadRouteCatalog,
+  prepareRouteRuntime,
+  type RouteRuntime,
+} from './route-runtime';
+import {
+  evaluateCanDeactivate,
+  executeNavigation,
+  RoutePreparationError,
+  type ActiveRender,
+  type NavigationFailure,
+  type NavigationRequest,
+  type NavigationResult,
+  type PreparedOutlet,
+} from './navigation-executor';
 import {
   isPathInsideBase,
   normalizeBaseHref,
@@ -47,7 +67,7 @@ export interface ActivatedRoute<
 
   readonly data: TData;
   readonly historyState: unknown;
-  readonly config: RenderableRoute;
+  readonly config: Route;
 }
 
 export interface NavigationContext<
@@ -111,26 +131,17 @@ export type ParseRouteQuery = (
   signal: AbortSignal,
 ) => MaybePromise<RouteQuery>;
 
-export interface LoadedRoute {
-  readonly component?: RouteComponent;
-  readonly canActivate?: CanActivateFn[];
-  readonly canDeactivate?: CanDeactivateFn[];
-  readonly prepare?: readonly PrepareRouteDataFn[];
-  readonly parseParams?: ParseRouteParams;
-  readonly parseQuery?: ParseRouteQuery;
-}
 
 export interface RouteBase {
-  name?: string;
-  path: string;
-  sourceRoute?: unknown;
-  data?: Record<string, unknown>;
+  readonly name?: string;
+  readonly path: string;
+  readonly sourceRoute?: unknown;
+  readonly data?: Record<string, unknown>;
 }
 
 export interface RedirectRoute extends RouteBase {
-  readonly kind: 'redirect';
+  readonly kind?: 'redirect';
   readonly redirectTo: string;
-
   readonly outlet?: never;
   readonly outlets?: never;
   readonly load?: never;
@@ -142,25 +153,23 @@ export interface RedirectRoute extends RouteBase {
 }
 
 export interface RenderableRoute extends RouteBase {
-  /**
-   * Optional for compatibility with direct createRouter() route records.
-   * Adapter-generated renderable routes always set kind to "route".
-   */
   readonly kind?: 'route';
-  outlet?: string;
-  /** Same-path named outlets activated atomically with this primary route. */
-  outlets?: readonly RenderableRoute[];
-  load?: () => MaybePromise<LoadedRoute>;
-  preload?: boolean;
-  viewTransition?: boolean;
-  canActivate?: CanActivateFn[];
-  canDeactivate?: CanDeactivateFn[];
-  prepare?: readonly PrepareRouteDataFn[];
-
+  readonly outlet?: string;
+  readonly outlets?: readonly RenderableRoute[];
+  readonly load?: () => MaybePromise<RouteRuntime>;
+  readonly preload?: boolean;
+  readonly viewTransition?: boolean;
+  readonly canActivate?: CanActivateFn[];
+  readonly canDeactivate?: CanDeactivateFn[];
+  readonly prepare?: readonly PrepareRouteDataFn[];
   readonly redirectTo?: never;
 }
 
 export type Route = RedirectRoute | RenderableRoute;
+
+function isRedirectRoute(route: Route): route is RedirectRoute {
+  return route.kind === 'redirect' || typeof route.redirectTo === 'string';
+}
 
 export interface NavigationTransition {
   readonly from: ActivatedRoute | null;
@@ -222,8 +231,20 @@ export interface RouterState {
   readonly routeConfig: Route | null;
 }
 
+export interface RouterConfiguration {
+  readonly routes: readonly Route[];
+  readonly transitions: readonly NavigationTransitionDefinition[];
+}
+
 export interface Router {
   readonly state: RouterState;
+  readonly routeVersion: number;
+  routes(): readonly Route[];
+  addRoutes(routes: readonly Route[]): boolean;
+  replaceConfiguration(configuration: RouterConfiguration): boolean;
+  replaceRoutes(routes: readonly Route[]): boolean;
+  removeRoutes(predicate: (route: Route) => boolean): boolean;
+  replaceTransitions(transitions: readonly NavigationTransitionDefinition[]): boolean;
   start(): void;
   stop(): void;
   dispose(): void;
@@ -266,89 +287,7 @@ interface NavigationCompletion {
   resolve(success: boolean): void;
 }
 
-interface NavigationRequest {
-  readonly id: number;
-  readonly url: URL;
-  readonly redirectCount: number;
-  readonly completion: NavigationCompletion;
-  readonly historyUpdate: HistoryUpdate;
-}
-
-interface RouteMatch {
-  readonly route: Route;
-  readonly params: RawRouteParams;
-}
-
-type RoutePattern = CompiledRoutePath;
-
-export interface PreparedOutlet {
-  readonly name: string;
-  readonly route: ActiveRoute;
-  readonly node: Node;
-  readonly component?: unknown;
-  readonly rendered: ActiveRender;
-}
-
-interface NavigationSuccess {
-  type: 'success';
-  request: NavigationRequest;
-  route: ActiveRoute;
-  outlets: readonly PreparedOutlet[];
-}
-
-interface NavigationRedirect {
-  type: 'redirect';
-  request: NavigationRequest;
-  redirectTo: string;
-  replace: boolean;
-}
-
-interface NavigationBlocked {
-  type: 'blocked';
-  request: NavigationRequest;
-}
-
-interface NavigationNotFound {
-  type: 'not-found';
-  request: NavigationRequest;
-}
-
-interface NavigationFailure {
-  type: 'error';
-  request: NavigationRequest;
-  error: unknown;
-  preserveActive?: boolean;
-}
-
-type NavigationResult =
-  | NavigationSuccess
-  | NavigationRedirect
-  | NavigationBlocked
-  | NavigationNotFound
-  | NavigationFailure;
-
-class RoutePreparationError extends Error {
-  constructor(
-    readonly originalError: unknown,
-    readonly preserveActive: boolean,
-  ) {
-    super(
-      originalError instanceof Error
-        ? originalError.message
-        : String(originalError),
-      { cause: originalError },
-    );
-    this.name = 'RoutePreparationError';
-  }
-}
-
-interface ActiveRoute extends ActivatedRoute {
-}
-
-interface ActiveRender {
-  readonly controller: AbortController;
-  readonly dispose: () => void;
-}
+export type { PreparedOutlet } from './navigation-executor';
 
 const EMPTY_PARAMS: RouteParams =
   Object.freeze({});
@@ -504,106 +443,14 @@ function defaultRender(outlet: HTMLElement, node: Node): void {
 }
 
 
-function validateRouteGroups(routes: readonly Route[]): void {
-  const primaryPaths = new Set<string>();
-
-  for (const primary of routes) {
-    const primaryOutlet = primary.outlet?.trim() ?? '';
-    if (primaryOutlet) {
-      throw new Error(
-        `Top-level route "${primary.path}" must target the primary outlet`,
-      );
-    }
-
-    if (primaryPaths.has(primary.path)) {
-      throw new Error(`Duplicate primary route path "${primary.path}"`);
-    }
-    primaryPaths.add(primary.path);
-
-    const outletNames = new Set<string>();
-    for (const outlet of primary.outlets ?? []) {
-      const name = outlet.outlet?.trim() ?? '';
-      if (!name) {
-        throw new Error(
-          `Secondary route for "${primary.path}" must define a named outlet`,
-        );
-      }
-      if (outletNames.has(name)) {
-        throw new Error(
-          `Duplicate outlet "${name}" for route "${primary.path}"`,
-        );
-      }
-      outletNames.add(name);
-
-      if (outlet.path !== primary.path) {
-        throw new Error(
-          `Outlet "${name}" must use the primary path "${primary.path}"`,
-        );
-      }
-      if (outlet.outlets?.length) {
-        throw new Error(`Outlet "${name}" cannot contain nested outlets`);
-      }
-      if (outlet.name) {
-        throw new Error(`Outlet "${name}" cannot define a route name`);
-      }
-      if (outlet.preload !== undefined) {
-        throw new Error(
-          `Outlet "${name}" cannot define preload; the primary route owns group preloading`,
-        );
-      }
-      if (outlet.viewTransition !== undefined) {
-        throw new Error(
-          `Outlet "${name}" cannot define viewTransition; the primary route owns the transition`,
-        );
-      }
-    }
-
-    if (primary.kind === 'redirect' && outletNames.size > 0) {
-      throw new Error(
-        `Redirect route "${primary.path}" cannot activate named outlets`,
-      );
-    }
-  }
-}
-
-const routeLoads = new WeakMap<RenderableRoute, Promise<LoadedRoute>>();
-
-function loadRoute(
-  route: RenderableRoute,
-): Promise<LoadedRoute> {
-  let pending = routeLoads.get(route);
-
-  if (!pending) {
-    pending = Promise
-      .resolve(
-        route.load?.() ?? {},
-      )
-      .then(loaded => ({
-        component: loaded.component,
-        canActivate: loaded.canActivate,
-        canDeactivate: loaded.canDeactivate,
-        prepare: loaded.prepare ?? route.prepare,
-        parseParams: loaded.parseParams,
-        parseQuery: loaded.parseQuery,
-      }))
-      .catch(error => {
-        routeLoads.delete(route);
-        throw error;
-      });
-
-    routeLoads.set(route, pending);
-  }
-
-  return pending;
-}
 
 export function createRouter(config: RouterConfig): Router {
-  validateRouteGroups(config.routes);
+  let routeCatalog = createRouteCatalog(config.routes);
   const render = config.render;
   const renderNotFound = config.renderNotFound;
   const renderError = config.renderError;
   const commitOutlets = config.commit;
-  const transitions = config.transitions ?? [];
+  let transitions = Object.freeze([...(config.transitions ?? [])]) as readonly NavigationTransitionDefinition[];
   const browserWindow = typeof window === 'undefined' ? null : window;
   const browserDocument = typeof document === 'undefined' ? null : document;
   const routerLocation = () =>
@@ -618,9 +465,8 @@ export function createRouter(config: RouterConfig): Router {
   const viewTransitions = config.viewTransitions ?? false;
   const history =
     new HistoryManager(browserWindow, routerLocation());
-  const routePatterns = new WeakMap<Route, RoutePattern>();
 
-  let currentState: ActiveRoute | null = null;
+  let currentState: ActivatedRoute | null = null;
   let requestState: NavigationRequest | null = null;
   let navigationPhase: NavigationPhase = null;
   let errorState: unknown = null;
@@ -631,7 +477,7 @@ export function createRouter(config: RouterConfig): Router {
   let latestRequestId = 0;
   let activeController: AbortController | null = null;
   const activeRenders = new Map<string, ActiveRender>();
-  const activeRouteStates = new Map<string, ActiveRoute>();
+  const activeRouteStates = new Map<string, ActivatedRoute>();
   let startRequestQueued = false;
   let preloadTask: Promise<void> | null = null;
   let preloadQueued = false;
@@ -734,10 +580,7 @@ export function createRouter(config: RouterConfig): Router {
       query: readRawQuery(url),
       data: EMPTY_DATA,
       historyState: decodeHistoryState(browserWindow?.history.state ?? null),
-      config:
-        config.routes.find(
-          (route): route is RenderableRoute => route.kind !== 'redirect',
-        ) ?? { path: '**' },
+      config: readCatalogRoutes(routeCatalog)[0] ?? { path: '**' },
     };
   }
 
@@ -850,9 +693,18 @@ export function createRouter(config: RouterConfig): Router {
     const href =
       active ?? fallback;
 
+    const currentEntry =
+      history.createDefaultUpdate().previousEntry;
+
     browserWindow?.history.replaceState(
-        currentState?.historyState ??
-          history.createDefaultUpdate().previousEntry?.state ?? null,
+        currentEntry
+          ? encodeHistoryState({
+              ...currentEntry,
+              state:
+                currentState?.historyState
+                ?? currentEntry.state,
+            })
+          : null,
         '',
         href,
       );
@@ -861,9 +713,9 @@ export function createRouter(config: RouterConfig): Router {
   }
 
   function applyHistoryStateToRoute(
-    route: ActiveRoute,
+    route: ActivatedRoute,
     historyState: unknown,
-  ): ActiveRoute {
+  ): ActivatedRoute {
     return { ...route, historyState };
   }
 
@@ -872,12 +724,12 @@ export function createRouter(config: RouterConfig): Router {
       throw new Error('Cannot update history state on a disposed router');
     }
 
-    const entry = history.createDefaultUpdate().previousEntry ?? {
-      href: currentHref(),
-      scroll: readScroll(),
-      id: 0,
-      state: null,
-    };
+    const update = history.createDefaultUpdate();
+    const entry = update.previousEntry;
+    if (!entry) {
+      throw new Error('History manager did not provide a current entry.');
+    }
+
     const nextEntry: HistoryEntry = {
       id: entry.id,
       href: entry.href,
@@ -890,7 +742,7 @@ export function createRouter(config: RouterConfig): Router {
         '',
         nextEntry.href,
       );
-    history.commitUpdate({ ...history.createDefaultUpdate(), nextEntry }, nextEntry.href);
+    history.commitUpdate({ ...update, nextEntry }, nextEntry.href);
     dispatchRouterLocationChange();
 
     if (currentState) {
@@ -1042,70 +894,17 @@ export function createRouter(config: RouterConfig): Router {
     notifyStateChange();
   }
 
-  function getRoutePattern(route: Route): RoutePattern {
-    const cached = routePatterns.get(route);
-    if (cached && cached.source === route.path) {
-      return cached;
-    }
 
-    const pattern = compileRoutePath(route.path);
 
-    routePatterns.set(route, pattern);
-    return pattern;
-  }
-
-  function recognize(path: string): RouteMatch | null {
-    const segments = splitRoutePath(path);
-    let fallback: Route | undefined;
-
-    for (const route of config.routes) {
-      if (route.path === '**' || route.path === '*') {
-        fallback = route;
-        continue;
-      }
-
-      const pattern = getRoutePattern(route);
-      const params = matchRoutePath(pattern, segments);
-      if (params) {
-        return {
-          route,
-          params,
-        };
-      }
-    }
-
-    return fallback
-      ? { route: fallback, params: Object.freeze({}) }
-      : null;
-  }
-
-  async function runPreloading(): Promise<void> {
+  function runPreloading(): Promise<void> {
     if (disposed) {
-      return;
+      return Promise.resolve();
     }
 
-    for (const route of config.routes) {
-      if (route.kind === 'redirect' || route.preload === false) {
-        continue;
-      }
-
-      const group: readonly RenderableRoute[] = [
-        route,
-        ...(route.outlets ?? []),
-      ];
-      for (const member of group) {
-        try {
-          const loaded = await loadRoute(member);
-          if (member !== route && (loaded.parseParams || loaded.parseQuery)) {
-            throw new Error(
-              `Outlet "${member.outlet}" cannot define parseParams or parseQuery`,
-            );
-          }
-        } catch (error) {
-          trace('Route preload failed', member.path, member.outlet ?? '', error);
-        }
-      }
-    }
+    return preloadRouteCatalog(
+      readCatalogRoutes(routeCatalog),
+      trace,
+    );
   }
 
   function preload(): Promise<void> {
@@ -1175,354 +974,32 @@ export function createRouter(config: RouterConfig): Router {
     preloadTimeoutId = browserWindow?.setTimeout(run, 0) ?? null;
   }
 
-  async function runCanDeactivateGuards(
-    nextUrl: URL,
-    signal: AbortSignal,
-  ): Promise<GuardResult> {
-    const routes = activeRouteStates.size > 0
-      ? [...activeRouteStates.values()]
-      : currentState
-        ? [currentState]
-        : [];
 
-    for (const activeRoute of routes) {
-      const context: DeactivationContext = {
-        ...activeRoute,
-        nextUrl,
-        signal,
-      };
-      const loaded = await loadRoute(activeRoute.config);
-      throwIfAborted(signal);
-
-      for (const guard of loaded.canDeactivate ?? []) {
-        const result = await executeDeactivationGuard(guard, context);
-        throwIfAborted(signal);
-        const redirect = readRedirect(result);
-        if (redirect) {
-          const redirectUrl = resolveAppUrl(redirect.redirectTo, 'href');
-          if (redirectUrl.href === nextUrl.href) {
-            warn('Ignoring canDeactivate redirect to the pending URL', redirect.redirectTo);
-            continue;
-          }
-          return redirect;
-        }
-        if (result === false) return false;
-      }
-    }
-
-    return true;
-  }
-
-  async function renderMatchedRoute(
-    routeState: ActivatedRoute,
-    loaded: LoadedRoute,
-    signal: AbortSignal,
-  ): Promise<{ node: Node; component?: unknown; rendered: ActiveRender }> {
-    const destroyController = new AbortController();
-    throwIfAborted(signal);
-    if (!loaded.component) {
-      throw new Error(`Matched route "${routeState.config.path}" has no component`);
-    }
-    const output = normalizeRenderedRouteNode(
-      await loaded.component(routeState, {
-        signal,
-        destroySignal: destroyController.signal,
-      }),
-    );
-    throwIfAborted(signal);
-    return {
-      node: output.node,
-      component: output.component,
-      rendered: {
-        controller: destroyController,
-        dispose: () => {
-          destroyController.abort();
-          output.dispose?.();
-        },
-      },
-    };
-  }
-
-  async function performNavigation(
-    request: NavigationRequest,
-    signal: AbortSignal,
-  ): Promise<NavigationResult> {
-    trace('Navigation started', request.url.href);
-    setPhase(request, 'recognizing');
-
-    if (!isInsideBase(request.url.pathname)) {
-      throw new Error(
-        `URL "${request.url.pathname}" is outside router base "${baseHref}"`,
-      );
-    }
-
-    const path = stripBaseHref(request.url.pathname, baseHref);
-    const match = recognize(path);
-    throwIfAborted(signal);
-
-    if (!match) {
-      setPhase(request, 'guarding');
-      const deactivationResult = await runCanDeactivateGuards(request.url, signal);
-      if (deactivationResult === false) {
-        return { type: 'blocked', request };
-      }
-
-      const deactivationRedirect = deactivationResult
-        ? readRedirect(deactivationResult)
-        : null;
-      if (deactivationRedirect) {
-        return { type: 'redirect', request, ...deactivationRedirect };
-      }
-
-      return { type: 'not-found', request };
-    }
-
-    const primaryRoute = match.route;
-
-    if (primaryRoute.kind === 'redirect') {
-      return {
-        type: 'redirect',
-        request,
-        redirectTo: interpolateRedirect(
-          primaryRoute.redirectTo,
-          match.params,
-        ),
-        replace: true,
-      };
-    }
-
-    const routes: readonly RenderableRoute[] = [
-      primaryRoute,
-      ...(primaryRoute.outlets ?? []),
-    ];
-    const historyState = request.historyUpdate.nextEntry?.state ?? null;
-
-    let loadedRoutes: LoadedRoute[];
-    try {
-      loadedRoutes = await Promise.all(routes.map(loadRoute));
-    } catch (error) {
-      throw new RoutePreparationError(
-        error,
-        currentState !== null && routes.length > 1,
-      );
-    }
-    throwIfAborted(signal);
-
-    for (let index = 1; index < loadedRoutes.length; index++) {
-      if (loadedRoutes[index].parseParams || loadedRoutes[index].parseQuery) {
-        throw new Error(
-          `Outlet "${routes[index].outlet}" cannot define parseParams or parseQuery`,
-        );
-      }
-    }
-
-    // The primary route owns URL parsing. Secondary outlets share the same
-    // validated params and query because they are not independently navigable.
-    const primaryLoaded = loadedRoutes[0];
-    const [parsedParams, parsedQuery] = await Promise.all([
-      primaryLoaded.parseParams
-        ? primaryLoaded.parseParams(match.params, request.url, signal)
-        : Promise.resolve(
-            Object.freeze({ ...match.params }) as RouteParams,
-          ),
-      primaryLoaded.parseQuery
-        ? primaryLoaded.parseQuery(request.url, signal)
-        : Promise.resolve(readRawQuery(request.url)),
-    ]);
-    throwIfAborted(signal);
-
-    const sharedParams = Object.freeze({ ...parsedParams });
-    const sharedQuery = Object.freeze({ ...parsedQuery });
-
-    const baseRoutes = routes.map<ActivatedRoute>(route => ({
-      url: request.url,
-      path,
-      params: sharedParams,
-      query: sharedQuery,
-      data: Object.freeze(route.data ?? {}),
-      historyState,
-      config: route,
-    }));
-
-    setPhase(request, 'guarding');
-
-    const beforeLeaveResult = await runTransitionPhase(
-      'beforeLeave',
-      currentState,
-      baseRoutes[0],
-      signal,
-    );
-    if (beforeLeaveResult === false) {
-      return { type: 'blocked', request };
-    }
-
-    const beforeLeaveRedirect = readRedirect(beforeLeaveResult);
-    if (beforeLeaveRedirect) {
-      return { type: 'redirect', request, ...beforeLeaveRedirect };
-    }
-
-    const deactivationResult = await runCanDeactivateGuards(request.url, signal);
-    if (deactivationResult === false) {
-      return { type: 'blocked', request };
-    }
-
-    const deactivationRedirect = deactivationResult
-      ? readRedirect(deactivationResult)
-      : null;
-    if (deactivationRedirect) {
-      return { type: 'redirect', request, ...deactivationRedirect };
-    }
-
-    const beforeEnterResult = await runTransitionPhase(
-      'beforeEnter',
-      currentState,
-      baseRoutes[0],
-      signal,
-    );
-    if (beforeEnterResult === false) {
-      return { type: 'blocked', request };
-    }
-
-    const beforeEnterRedirect = readRedirect(beforeEnterResult);
-    if (beforeEnterRedirect) {
-      return { type: 'redirect', request, ...beforeEnterRedirect };
-    }
-
-    for (let index = 0; index < loadedRoutes.length; index++) {
-      const context: NavigationContext = {
-        ...baseRoutes[index],
-        signal,
-      };
-
-      for (const guard of loadedRoutes[index].canActivate ?? []) {
-        const result = await executeGuard(guard, context);
-        throwIfAborted(signal);
-        const redirect = readRedirect(result);
-        if (redirect) {
-          return { type: 'redirect', request, ...redirect };
-        }
-        if (result === false) {
-          return { type: 'blocked', request };
-        }
-      }
-    }
-
-    const prepareResult = await runTransitionPhase(
-      'prepare',
-      currentState,
-      baseRoutes[0],
-      signal,
-    );
-    if (prepareResult === false) {
-      return { type: 'blocked', request };
-    }
-
-    const prepareRedirect = readRedirect(prepareResult);
-    if (prepareRedirect) {
-      return { type: 'redirect', request, ...prepareRedirect };
-    }
-
-    setPhase(request, 'resolving');
-    const preparedRouteData =
-      new WeakMap<
-        PrepareRouteDataFn,
-        Promise<RouteData>
-      >();
-
-    const activatedRoutes = await Promise.all(
-      baseRoutes.map(async (baseRoute, index): Promise<ActiveRoute> => {
-        const context: NavigationContext = {
-          ...baseRoute,
-          signal,
-        };
-
-        const preparedData = mergeRouteData(
-          await Promise.all(
-            (loadedRoutes[index].prepare ?? []).map(
-              prepare => {
-                let pending =
-                  preparedRouteData.get(
-                    prepare,
-                  );
-
-                if (!pending) {
-                  pending = Promise.resolve(
-                    executePrepareRouteData(
-                      prepare,
-                      context,
-                    ),
-                  ).then(result =>
-                    normalizePreparedRouteData(
-                      result,
-                    ),
-                  );
-
-                  preparedRouteData.set(
-                    prepare,
-                    pending,
-                  );
-                }
-
-                return pending;
-              },
-            ),
-          ),
-        );
-        throwIfAborted(signal);
-
-        return {
-          ...baseRoute,
-          data: mergeRouteData([
-            baseRoute.data,
-            preparedData,
-          ]),
-        };
-      }),
-    );
-
-    setPhase(request, 'loading');
-
-    const prepared: PreparedOutlet[] = [];
-    try {
-      for (let index = 0; index < activatedRoutes.length; index++) {
-        const route = activatedRoutes[index];
-        const rendered = await renderMatchedRoute(
-          route,
-          loadedRoutes[index],
-          signal,
-        );
-        prepared.push({
-          name: route.config.outlet?.trim() ?? '',
-          route,
-          ...rendered,
-        });
-      }
-    } catch (error) {
-      for (let index = prepared.length - 1; index >= 0; index--) {
-        try {
-          prepared[index].rendered.dispose();
-        } catch {}
-      }
-
-      throw new RoutePreparationError(
-        error,
-        currentState !== null && routes.length > 1,
-      );
-    }
-
-    return {
-      type: 'success',
-      request,
-      route: activatedRoutes[0],
-      outlets: Object.freeze(prepared),
-    };
-  }
 
   async function runNavigation(request: NavigationRequest, signal: AbortSignal): Promise<void> {
     if (disposed) return;
 
     try {
-      const result = await performNavigation(request, signal);
+      const result = await executeNavigation(
+        request,
+        signal,
+        {
+          catalog: routeCatalog,
+          baseHref,
+          currentRoute: currentState,
+          activeRoutes: activeRouteStates.size > 0
+            ? [...activeRouteStates.values()]
+            : currentState
+              ? [currentState]
+              : [],
+          loadRoute: prepareRouteRuntime,
+          runTransitionPhase,
+          resolveAppUrl: target => resolveAppUrl(target, 'href'),
+          setPhase,
+          trace,
+          warn,
+        },
+      );
       if (disposed || result.request.id !== latestRequestId) {
         if (result.type === 'success') {
           for (const outlet of result.outlets) {
@@ -1566,9 +1043,20 @@ export function createRouter(config: RouterConfig): Router {
       setPhase(request, 'guarding');
 
       const deactivationResult =
-        await runCanDeactivateGuards(
+        await evaluateCanDeactivate(
           request.url,
           signal,
+          {
+            activeRoutes: activeRouteStates.size > 0
+              ? [...activeRouteStates.values()]
+              : currentState
+                ? [currentState]
+                : [],
+            loadRoute: prepareRouteRuntime,
+            resolveAppUrl: target =>
+              resolveAppUrl(target, 'href'),
+            warn,
+          },
         );
 
       throwIfAborted(signal);
@@ -1615,7 +1103,9 @@ export function createRouter(config: RouterConfig): Router {
           redirectUrl.hash;
 
         const historyState =
-          decodeHistoryState(browserWindow?.history.state ?? null);
+          decodeHistoryState(
+            browserWindow?.history.state ?? null,
+          );
 
         const historyUpdate =
           history.createUpdate(
@@ -1629,7 +1119,9 @@ export function createRouter(config: RouterConfig): Router {
               ? 'replaceState'
               : 'pushState'
           ](
-            encodeHistoryState(historyUpdate.nextEntry!),
+            encodeHistoryState(
+              historyUpdate.nextEntry!,
+            ),
             '',
             href,
           );
@@ -1700,232 +1192,124 @@ export function createRouter(config: RouterConfig): Router {
   }
 
   function commit(result: NavigationResult): void {
-    if (disposed || result.request.id !== latestRequestId) return;
-
-    switch (result.type) {
-      case 'success': {
-        const previousRoute = currentState;
-        runWithViewTransition({
-          url: result.request.url,
-          from: currentState,
-          to: result.route,
-          phase: 'success',
-          routeConfig: result.route.config,
-        }, () => {
-          const nextNames = new Set(result.outlets.map(outlet => outlet.name));
-
-          // A custom group commit remains atomic: old renders stay active until
-          // the complete group has committed successfully. The built-in/per-outlet
-          // renderer disposes old views first so their disposal hooks still observe
-          // the view attached to its outlet.
-          if (!commitOutlets) {
-            for (const renderInstance of activeRenders.values()) {
-              disposeRender(renderInstance);
-            }
-            activeRenders.clear();
-            activeRouteStates.clear();
-          }
-
-          try {
-            if (commitOutlets) {
-              commitOutlets(result.outlets);
-            } else {
-              for (const outlet of result.outlets) {
-                if (outlet.name === '') {
-                  renderPrimaryNode(outlet.node, outlet.route);
-                } else if (render) {
-                  render(outlet.name, outlet.node, outlet.route);
-                } else {
-                  throw new Error(
-                    `No renderer is configured for outlet "${outlet.name}"`,
-                  );
-                }
-              }
-            }
-          } catch (error) {
-            for (const outlet of result.outlets) {
-              outlet.rendered.dispose();
-            }
-            throw error;
-          }
-
-          if (commitOutlets) {
-            for (const [name] of activeRenders.entries()) {
-              if (!nextNames.has(name)) {
-                replaceActiveRender(name, null);
-                activeRouteStates.delete(name);
-              }
-            }
-          }
-
-          for (const outlet of result.outlets) {
-            if (commitOutlets) {
-              replaceActiveRender(outlet.name, outlet.rendered);
-            } else {
-              activeRenders.set(outlet.name, outlet.rendered);
-            }
-            activeRouteStates.set(outlet.name, outlet.route);
-
-            // The router only knows the concrete DOM target for its default
-            // primary outlet. Custom named-outlet renderers own activation hooks.
-            if (!commitOutlets && outlet.name === '') {
-              const target = outlet.node.parentElement ?? resolveOutlet();
-              if (target) {
-                notifyOutletActivate(target, outlet.component);
-              }
-            }
-          }
-        });
-        history.commitUpdate(
-          result.request.historyUpdate,
-          result.request.url.pathname + result.request.url.search + result.request.url.hash,
-        );
-        currentState = result.route;
+    commitNavigation(result, {
+      disposed: () => disposed,
+      latestRequestId: () => latestRequestId,
+      maxRedirects,
+      currentRoute: () => currentState,
+      setCurrentRoute: route => {
+        currentState = route;
+      },
+      clearPendingState: () => {
         requestState = null;
         navigationPhase = null;
-        errorState = null;
-        browserWindow?.dispatchEvent(new CustomEvent('routechange', { detail: result.route }));
-        trace('Navigation completed', result.route.path);
-        restoreScroll(result.request.historyUpdate);
-        settleRequest(result.request, true);
-        notifyStateChange();
-        runAfterEnterTransitions(previousRoute, result.route);
-        return;
-      }
-      case 'redirect': {
-        if (result.request.redirectCount >= maxRedirects) {
-          commit({
-            type: 'error',
-            request: result.request,
-            error: new Error(`Maximum redirect count of ${maxRedirects} exceeded`),
-          });
-          return;
-        }
+      },
+      setError: error => {
+        errorState = error;
+      },
 
-        const url = resolveAppUrl(result.redirectTo, 'href');
-        if (
-          url.origin !==
-          routerLocation().origin
-        ) {
-          void requestExternalNavigation(
-            url,
-            result.request.completion,
-            result.request.historyUpdate,
+      runWithViewTransition,
+      customCommit: commitOutlets,
+      render: (outletName, node, route) => {
+        if (!render) {
+          throw new Error(
+            `No renderer is configured for outlet "${outletName}"`,
           );
+        }
+        render(outletName, node, route);
+      },
+      renderPrimary: (node, route) => {
+        renderPrimaryNode(node, route);
+      },
+      renderNotFound: url => {
+        if (renderNotFound) {
+          renderNotFound('', url, publicRouter);
           return;
         }
 
-        const href = url.pathname + url.search + url.hash;
-        const historyState = decodeHistoryState(browserWindow?.history.state ?? null);
-        const historyUpdate = history.createUpdate(href, result.replace, historyState);
-        browserWindow?.history[result.replace ? 'replaceState' : 'pushState'](historyState, '', href);
-        dispatchRouterLocationChange();
-        void requestNavigation(
-          url,
-          result.request.redirectCount + 1,
-          result.request.completion,
-          historyUpdate,
-        );
-        return;
-      }
-      case 'blocked': {
-        restoreActiveUrl();
-        history.rollbackUpdate(result.request.historyUpdate);
-        requestState = null;
-        navigationPhase = null;
-        errorState = null;
-        trace('Navigation blocked');
-        restorePreviousScroll(result.request.historyUpdate);
-        settleRequest(result.request, false);
-        notifyStateChange();
-        return;
-      }
-      case 'not-found': {
-        runWithViewTransition({
-          url: result.request.url,
-          from: currentState,
-          to: null,
-          phase: 'not-found',
-          routeConfig: null,
-        }, () => {          
-          if (renderNotFound) {
-            renderNotFound('', result.request.url, publicRouter);
-          } else {
-            const heading = browserDocument?.createElement('h1');
-            if (!heading) return;
-            heading.textContent = '404 — Page Not Found';
-            renderPrimaryNode(
-              heading,
-              createStatusRoute(result.request.url),
-            );
-          }
-
-          disposeAllRenders();
-        });
-        history.commitUpdate(
-          result.request.historyUpdate,
-          result.request.url.pathname + result.request.url.search + result.request.url.hash,
-        );
-        currentState = null;
-        requestState = null;
-        navigationPhase = null;
-        errorState = null;
-        trace('Route not found', result.request.url.pathname);
-        restoreScroll(result.request.historyUpdate);
-        settleRequest(result.request, false);
-        notifyStateChange();
-        return;
-      }
-      case 'error': {
-        restoreActiveUrl();
-
-        if (!result.preserveActive) {
-          runWithViewTransition({
-            url: result.request.url,
-            from: currentState,
-            to: null,
-            phase: 'error',
-            routeConfig: null,
-            error: result.error,
-          }, () => {
-            if (renderError) {
-              renderError('', result.error, publicRouter);
-            } else {
-              const heading = browserDocument?.createElement('h1');
-              if (!heading) return;
-              heading.textContent = 'Page failed to load';
-              renderPrimaryNode(
-                heading,
-                createStatusRoute(result.request.url),
-              );
-            }
-
-            disposeAllRenders();
-          });
+        const heading = browserDocument?.createElement('h1');
+        if (!heading) return;
+        heading.textContent = '404 — Page Not Found';
+        renderPrimaryNode(heading, createStatusRoute(url));
+      },
+      renderError: (error, url) => {
+        if (renderError) {
+          renderError('', error, publicRouter);
+          return;
         }
 
-        history.rollbackUpdate(result.request.historyUpdate);
-        if (!result.preserveActive) {
-          currentState = null;
-        }
-        requestState = null;
-        navigationPhase = null;
-        errorState = result.error;
-        trace('Navigation failed', result.error);
-        restorePreviousScroll(result.request.historyUpdate);
-        settleRequest(result.request, false);
-        notifyStateChange();
-        return;
-      }
-    }
+        const heading = browserDocument?.createElement('h1');
+        if (!heading) return;
+        heading.textContent = 'Page failed to load';
+        renderPrimaryNode(heading, createStatusRoute(url));
+      },
+      resolveOutlet,
+      notifyOutletActivate,
+
+      activeRenders,
+      activeRoutes: activeRouteStates,
+      disposeRender,
+      replaceActiveRender,
+      disposeAllRenders,
+
+      commitHistory: (update, href) => {
+        history.commitUpdate(update, href);
+      },
+      rollbackHistory: update => {
+        history.rollbackUpdate(update);
+      },
+      createHistoryUpdate: (href, replace, state) =>
+        history.createUpdate(href, replace, state),
+      readHistoryState: () => decodeHistoryState(browserWindow?.history.state ?? null),
+      writeHistory: (href, replace, _state, update) => {
+        browserWindow?.history[
+          replace ? 'replaceState' : 'pushState'
+        ](
+          encodeHistoryState(update.nextEntry!),
+          '',
+          href,
+        );
+      },
+      dispatchLocationChange: dispatchRouterLocationChange,
+
+      resolveAppUrl: target => resolveAppUrl(target, 'href'),
+      currentOrigin: () => routerLocation().origin,
+      requestNavigation: (url, redirectCount, completion, update) => {
+        void requestNavigation(url, redirectCount, completion, update);
+      },
+      requestExternalNavigation: (url, completion, update) => {
+        void requestExternalNavigation(url, completion, update);
+      },
+
+      restoreActiveUrl,
+      restoreScroll,
+      restorePreviousScroll,
+      settleRequest: (completion, success) => {
+        if (completion.settled) return;
+        completion.settled = true;
+        completion.resolve(success);
+      },
+      notifyStateChange,
+      runAfterEnterTransitions,
+      dispatchRouteChange: route => {
+        browserWindow?.dispatchEvent(
+          new CustomEvent('routechange', { detail: route }),
+        );
+      },
+      trace,
+    });
   }
 
   function handlePopState(): void {
+    const location = routerLocation();
+    const update = history.createPopStateUpdate(currentHref());
+    const targetHref = update.nextEntry?.href ?? currentHref();
+
     requestNavigation(
-      new URL(routerLocation().href),
+      new URL(targetHref, location.origin),
       0,
       undefined,
-      history.createPopStateUpdate(currentHref()),
+      update,
     );
   }
 
@@ -1997,10 +1381,12 @@ export function createRouter(config: RouterConfig): Router {
       throw new Error('Cannot revalidate with a disposed router');
     }
 
-    const location = routerLocation();
-    const url = new URL(location.href);
+    const url = new URL(routerLocation().href);
 
-    if (url.origin !== location.origin) {
+    if (
+      url.origin !==
+      routerLocation().origin
+    ) {
       return requestExternalNavigation(
         url,
         undefined,
@@ -2014,13 +1400,130 @@ export function createRouter(config: RouterConfig): Router {
       );
     }
 
-    // Revalidation bypasses same-URL suppression and performs a complete
-    // navigation transaction without mutating browser history.
+    // Revalidation intentionally bypasses onSameUrlNavigation. It performs a
+    // complete navigation transaction for the current URL without mutating
+    // browser history, allowing guards, prepare handlers, layouts, and named
+    // outlets to be rebuilt after external authority or session state changes.
     return requestNavigation(
       url,
       0,
       undefined,
       history.createDefaultUpdate(),
+    );
+  }
+
+
+  function sameTransitionReferences(
+    nextTransitions: readonly NavigationTransitionDefinition[],
+  ): boolean {
+    return (
+      transitions.length === nextTransitions.length
+      && transitions.every(
+        (transition, index) =>
+          transition === nextTransitions[index],
+      )
+    );
+  }
+
+  function applyConfiguration(
+    nextCatalog: RouteCatalog,
+    nextTransitions: readonly NavigationTransitionDefinition[],
+  ): boolean {
+    const routesChanged =
+      nextCatalog !== routeCatalog;
+    const transitionsChanged =
+      !sameTransitionReferences(nextTransitions);
+
+    if (!routesChanged && !transitionsChanged) {
+      return false;
+    }
+
+    // One configuration transaction owns one cancellation, even when both
+    // routes and transitions change together.
+    cancelActiveNavigation();
+
+    if (routesChanged) {
+      routeCatalog = nextCatalog;
+      cancelScheduledPreloading();
+    }
+
+    if (transitionsChanged) {
+      transitions =
+        Object.freeze([...nextTransitions]);
+    }
+
+    if (routesChanged) {
+      schedulePreloading();
+    }
+
+    return true;
+  }
+
+  function addRoutes(routes: readonly Route[]): boolean {
+    if (disposed) {
+      throw new Error('Cannot add routes to a disposed router');
+    }
+
+    return applyConfiguration(
+      appendCatalogRoutes(routeCatalog, routes),
+      transitions,
+    );
+  }
+
+  function replaceConfiguration(
+    configuration: RouterConfiguration,
+  ): boolean {
+    if (disposed) {
+      throw new Error(
+        'Cannot replace configuration on a disposed router',
+      );
+    }
+
+    // Build and validate the next catalog before cancelling the current
+    // navigation. A rejected configuration leaves the active router untouched.
+    const nextCatalog = replaceCatalogRoutes(
+      routeCatalog,
+      configuration.routes,
+    );
+
+    return applyConfiguration(
+      nextCatalog,
+      configuration.transitions,
+    );
+  }
+
+  function replaceRoutes(routes: readonly Route[]): boolean {
+    if (disposed) {
+      throw new Error('Cannot replace routes on a disposed router');
+    }
+
+    return applyConfiguration(
+      replaceCatalogRoutes(routeCatalog, routes),
+      transitions,
+    );
+  }
+
+  function removeRoutes(predicate: (route: Route) => boolean): boolean {
+    if (disposed) {
+      throw new Error('Cannot remove routes from a disposed router');
+    }
+
+    return applyConfiguration(
+      removeCatalogRoutes(routeCatalog, predicate),
+      transitions,
+    );
+  }
+
+  function replaceTransitions(
+    nextTransitions: readonly NavigationTransitionDefinition[],
+  ): boolean {
+    if (disposed) {
+      throw new Error('Cannot replace transitions on a disposed router');
+    }
+
+    return applyConfiguration(
+      routeCatalog,
+      nextTransitions,
     );
   }
 
@@ -2036,16 +1539,6 @@ export function createRouter(config: RouterConfig): Router {
     }
 
     started = true;
-
-    const initialHistoryEntry = history.createDefaultUpdate().previousEntry;
-    if (initialHistoryEntry) {
-      browserWindow?.history.replaceState(
-        encodeHistoryState(initialHistoryEntry),
-        '',
-        initialHistoryEntry.href,
-      );
-    }
-
     browserWindow?.addEventListener(
         'popstate',
         handlePopState,
@@ -2172,6 +1665,16 @@ export function createRouter(config: RouterConfig): Router {
 
   publicRouter = {
     state: publicState,
+    get routeVersion() {
+      return routeCatalog.version;
+    },
+    routes: () => readCatalogRoutes(routeCatalog),
+    addRoutes: (routes) => addRoutes(routes),
+    replaceConfiguration: (configuration) =>
+      replaceConfiguration(configuration),
+    replaceRoutes: (routes) => replaceRoutes(routes),
+    removeRoutes: (predicate) => removeRoutes(predicate),
+    replaceTransitions: (nextTransitions) => replaceTransitions(nextTransitions),
     start: () => startRouter(),
     stop: () => stopRouter(),
     dispose: () => {

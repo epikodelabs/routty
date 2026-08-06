@@ -1121,9 +1121,11 @@ idescribe('Router', () => {
             await router.navigate('/about');
             scrollX = 320;
             scrollY = 480;
+            const popstate = new Promise<void>(resolve => {
+                window.addEventListener('popstate', () => resolve(), { once: true });
+            });
             window.history.back();
-            const popstateEvent = new PopStateEvent('popstate');
-            window.dispatchEvent(popstateEvent);
+            await popstate;
             await delay(50);
             expect(scrollToSpy).toHaveBeenCalledWith(30, 140);
             expect(router.state.current?.path).toBe('/');
@@ -1149,7 +1151,14 @@ idescribe('Router', () => {
             await router.navigate('/', { state: { page: 'home' } });
             const replaceStateSpy = spyOn(window.history, 'replaceState').and.callThrough();
             await router.navigate('/blocked', { state: { page: 'blocked' } });
-            expect(replaceStateSpy).toHaveBeenCalledWith({ page: 'home' }, '', '/');
+            const replaceStateCall =
+                replaceStateSpy.calls.mostRecent();
+
+            expect(
+                replaceStateCall.args[0].__routtyUserState,
+            ).toEqual({ page: 'home' });
+            expect(replaceStateCall.args[1]).toBe('');
+            expect(replaceStateCall.args[2]).toBe('/');
             expect(router.state.current?.path).toBe('/');
             expect(router.state.historyState).toEqual({ page: 'home' });
         });

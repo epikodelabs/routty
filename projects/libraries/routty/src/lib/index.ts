@@ -12,7 +12,6 @@ export {
     createRouter,
     type ActivatedRoute,
     type DeactivationContext,
-    type LoadedRoute,
     type NavigationContext,
     type NavigationOptions,
     type NavigationPhase,
@@ -34,6 +33,7 @@ export {
     type Router as VanillaRouter,
     type RouterConfig as VanillaRouterConfig,
     type RouterState,
+    type RouterConfiguration,
     type ScrollRestorationMode,
     type VanillaRouterInstance,
     type ViewTransitionContext,
@@ -44,3 +44,4 @@ export {
     provideRouter, ROUTE,
     ROUTE_CONTEXT, Router, type RouterOptions
 } from './router';
+export type { RouteRuntime } from './route-runtime';

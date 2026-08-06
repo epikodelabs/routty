@@ -127,12 +127,20 @@ export function compileRoutes(
       continue;
     }
 
+    // An empty child path is the index route of the current layout branch.
+    // Preserve the already compiled parent path exactly instead of treating the
+    // empty segment as a new route level.
+    const path =
+      entry.path === ''
+        ? parentPath
+        : joinRoutePath(
+            parentPath,
+            entry.path,
+          );
+
     output.push({
       route: entry,
-      path: joinRoutePath(
-        parentPath,
-        entry.path,
-      ),
+      path,
       redirectTo: entry.kind === 'redirect'
         ? compileRedirect(parentPath, entry.redirectTo)
         : undefined,
