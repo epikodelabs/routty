@@ -432,8 +432,26 @@ function adaptRoutes(
       injector,
     );
 
+    const authoredPrimary =
+      group.primary.route;
+
+    // Narrow the authored definition before calling adaptRoute(). The runtime
+    // redirect discriminant is optional for compatibility, so narrowing the
+    // adapted Route union afterwards is not reliable enough for TypeScript.
+    if (authoredPrimary.kind === 'redirect') {
+      return adaptRoute(
+        authoredPrimary,
+        group.path,
+        group.primary.redirectTo,
+        group.layouts,
+        sharedPreparers,
+        appRef,
+        injector,
+      );
+    }
+
     const primary = adaptRoute(
-      group.primary.route,
+      authoredPrimary,
       group.path,
       group.primary.redirectTo,
       group.layouts,
@@ -442,27 +460,29 @@ function adaptRoutes(
       injector,
     );
 
-    if (primary.kind === 'redirect') {
-      return primary;
-    }
+    const outlets: RuntimeRenderableRoute[] =
+      group.outlets.map(
+        (compiled: CompiledRoute): RuntimeRenderableRoute => {
+          const authoredOutlet =
+            compiled.route;
 
-    const outlets = group.outlets.map((compiled: CompiledRoute) => {
-      if (compiled.route.kind === 'redirect') {
-        throw new Error(
-          `Named outlet route "${compiled.path}" cannot be a redirect.`,
-        );
-      }
+          if (authoredOutlet.kind === 'redirect') {
+            throw new Error(
+              `Named outlet route "${compiled.path}" cannot be a redirect.`,
+            );
+          }
 
-      return adaptRoute(
-        compiled.route,
-        group.path,
-        compiled.redirectTo,
-        group.layouts,
-        sharedPreparers,
-        appRef,
-        injector,
+          return adaptRoute(
+            authoredOutlet,
+            group.path,
+            compiled.redirectTo,
+            group.layouts,
+            sharedPreparers,
+            appRef,
+            injector,
+          );
+        },
       );
-    });
 
     return outlets.length > 0
       ? {
