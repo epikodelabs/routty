@@ -133,8 +133,7 @@ idescribe('Router redirect chains', () => {
     ).toBeTrue();
 
     expect(
-      window.history.state
-        .__routtyUserState,
+      window.history.state,
     ).toEqual(state);
     expect(router.state.historyState)
       .toEqual(state);
@@ -170,11 +169,8 @@ idescribe('Router redirect chains', () => {
 
     expect(window.location.pathname)
       .toBe('/target');
-    expect(pushState).toHaveBeenCalledWith(
-      jasmine.any(Object),
-      '',
-      '/target',
-    );
+    expect(pushState.calls.mostRecent().args)
+      .toEqual([null, '', '/target']);
     expect(router.state.current?.config)
       .toBe(target);
 

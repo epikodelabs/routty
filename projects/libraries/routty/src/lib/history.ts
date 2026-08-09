@@ -19,35 +19,7 @@ export interface HistoryUpdate {
   readonly nextEntry?: HistoryEntry;
 }
 
-interface RouttyHistoryState {
-  readonly __routtyEntryId: number;
-  readonly __routtyUserState: unknown;
-}
-
 export const ZERO_SCROLL: ScrollPosition = Object.freeze({ x: 0, y: 0 });
-
-export function encodeHistoryState(entry: Pick<HistoryEntry, 'id' | 'state'>): RouttyHistoryState {
-  return {
-    __routtyEntryId: entry.id,
-    __routtyUserState: entry.state,
-  };
-}
-
-export function decodeHistoryState(value: unknown): unknown {
-  return isRouttyHistoryState(value) ? value.__routtyUserState : value;
-}
-
-function readHistoryEntryId(value: unknown): number | undefined {
-  return isRouttyHistoryState(value) ? value.__routtyEntryId : undefined;
-}
-
-function isRouttyHistoryState(value: unknown): value is RouttyHistoryState {
-  return typeof value === 'object'
-    && value !== null
-    && '__routtyEntryId' in value
-    && typeof (value as { __routtyEntryId?: unknown }).__routtyEntryId === 'number'
-    && '__routtyUserState' in value;
-}
 
 export class HistoryManager {
   constructor(
@@ -57,6 +29,10 @@ export class HistoryManager {
       typeof window === 'undefined'
         ? { pathname: '/', search: '', hash: '' }
         : window.location,
+    private readonly decorateState: (state: unknown, entryId: number) => unknown =
+      state => state,
+    private readonly readEntryId: (state: unknown) => number | null =
+      () => null,
   ) {}
 
   private entries: HistoryEntry[] = [];
@@ -74,12 +50,8 @@ export class HistoryManager {
     };
   }
 
-  private readBrowserState(): unknown {
-    return this.browserWindow?.history.state ?? null;
-  }
-
   private readHistoryState(): unknown {
-    return decodeHistoryState(this.readBrowserState());
+    return this.browserWindow?.history.state ?? null;
   }
 
   private allocateId(): number {
@@ -89,8 +61,8 @@ export class HistoryManager {
   private ensureHistoryEntry(): void {
     if (this.entries.length > 0) return;
 
-    const browserState = this.readBrowserState();
-    const existingId = readHistoryEntryId(browserState);
+    const browserState = this.readHistoryState();
+    const existingId = this.readEntryId(browserState);
     const id = existingId ?? this.allocateId();
     this.nextId = Math.max(this.nextId, id + 1);
 
@@ -98,17 +70,15 @@ export class HistoryManager {
       id,
       href: this.currentHref,
       scroll: this.readScroll(),
-      state: decodeHistoryState(browserState),
+      state: this.decorateState(browserState, id),
     }];
     this.index = 0;
   }
 
   private saveCurrentScroll(): ScrollPosition {
     const scroll = this.readScroll();
-    if (this.index >= 0) {
-      const entry = this.entries[this.index];
-      if (entry) this.entries[this.index] = { ...entry, scroll };
-    }
+    const entry = this.entries[this.index];
+    if (entry) this.entries[this.index] = { ...entry, scroll };
     return scroll;
   }
 
@@ -120,6 +90,7 @@ export class HistoryManager {
       nextIndex: this.index,
       previousScroll: this.readScroll(),
       previousEntry: this.entries[this.index],
+      nextEntry: this.entries[this.index],
     };
   }
 
@@ -128,27 +99,25 @@ export class HistoryManager {
     const previousScroll = this.saveCurrentScroll();
     const previousIndex = this.index;
     const current = this.entries[this.index];
+    const id = replace && current ? current.id : this.allocateId();
     const nextEntry: HistoryEntry = {
-      id: replace && current ? current.id : this.allocateId(),
+      id,
       href,
       scroll: replace ? previousScroll : ZERO_SCROLL,
-      state: state ?? null,
+      state: this.decorateState(state, id),
     };
 
     if (replace) {
       const previousEntry = this.entries[this.index];
       this.entries[this.index] = nextEntry;
-      return {
-        type: 'replace', previousIndex, nextIndex: this.index,
-        previousEntry, previousScroll, nextEntry,
-      };
+      return { type: 'replace', previousIndex, nextIndex: this.index, previousEntry, previousScroll, nextEntry };
     }
 
     this.entries = this.entries.slice(0, this.index + 1);
     this.entries.push(nextEntry);
     return {
-      type: 'push', previousIndex, nextIndex: this.index + 1,
-      previousScroll, previousEntry: this.entries[previousIndex], nextEntry,
+      type: 'push', previousIndex, nextIndex: this.index + 1, previousScroll,
+      previousEntry: this.entries[previousIndex], nextEntry,
     };
   }
 
@@ -156,21 +125,21 @@ export class HistoryManager {
     this.ensureHistoryEntry();
     const previousScroll = this.saveCurrentScroll();
     const previousIndex = this.index;
-    const browserState = this.readBrowserState();
-    const entryId = readHistoryEntryId(browserState);
-    const resolvedIndex = entryId === undefined
+    const browserState = this.readHistoryState();
+    const entryId = this.readEntryId(browserState);
+    const resolvedIndex = entryId === null
       ? this.findHistoryIndexByHref(href)
       : this.entries.findIndex(entry => entry.id === entryId);
-    const nextIndex = resolvedIndex >= 0 ? resolvedIndex : previousIndex;
+    const nextIndex = resolvedIndex >= 0
+      ? resolvedIndex
+      : this.entries[previousIndex - 1]
+        ? previousIndex - 1
+        : previousIndex;
     const existing = this.entries[nextIndex];
+    const id = entryId ?? existing?.id ?? this.allocateId();
     const nextEntry: HistoryEntry = existing
-      ? { ...existing, href, state: decodeHistoryState(browserState) }
-      : {
-          id: entryId ?? this.allocateId(),
-          href,
-          scroll: ZERO_SCROLL,
-          state: decodeHistoryState(browserState),
-        };
+      ? { ...existing, id, href, state: this.decorateState(browserState, id) }
+      : { id, href, scroll: ZERO_SCROLL, state: this.decorateState(browserState, id) };
 
     return {
       type: 'popstate', previousIndex, nextIndex, previousScroll,
@@ -189,10 +158,7 @@ export class HistoryManager {
     for (let index = 0; index < this.entries.length; index++) {
       if (this.entries[index]?.href !== href || index === this.index) continue;
       const distance = Math.abs(index - this.index);
-      if (distance < bestDistance) {
-        bestIndex = index;
-        bestDistance = distance;
-      }
+      if (distance < bestDistance) { bestIndex = index; bestDistance = distance; }
     }
     return bestIndex;
   }
@@ -218,11 +184,12 @@ export class HistoryManager {
 
   commitUpdate(update: HistoryUpdate, href: string): void {
     this.index = update.nextIndex;
+    const previous = this.entries[this.index];
     this.entries[this.index] = update.nextEntry ?? {
-      id: this.allocateId(),
+      id: previous?.id ?? this.allocateId(),
       href,
       scroll: update.type === 'replace' ? update.previousScroll : ZERO_SCROLL,
-      state: null,
+      state: this.decorateState(null, previous?.id ?? this.nextId - 1),
     };
   }
 }

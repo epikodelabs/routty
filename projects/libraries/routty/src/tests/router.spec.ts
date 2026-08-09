@@ -211,12 +211,7 @@ idescribe('Router', () => {
             router.navigate('/about', { state: { from: 'test' } });
             await delay(50);
             expect(pushStateSpy).toHaveBeenCalledWith(
-                jasmine.objectContaining({
-                    __routtyEntryId: jasmine.any(Number),
-                    __routtyUserState: {
-                        from: 'test'
-                    }
-                }),
+                { from: 'test' },
                 '',
                 '/about'
             );
@@ -238,13 +233,7 @@ idescribe('Router', () => {
             const replaceStateSpy = spyOn(window.history, 'replaceState').and.callThrough();
             router.updateHistoryState({ from: 'updated', step: 2 });
             expect(replaceStateSpy).toHaveBeenCalledWith(
-                jasmine.objectContaining({
-                    __routtyEntryId: jasmine.any(Number),
-                    __routtyUserState: {
-                        from: 'updated',
-                        step: 2
-                    }
-                }),
+                { from: 'updated', step: 2 },
                 '',
                 '/about'
             );
@@ -1155,7 +1144,7 @@ idescribe('Router', () => {
                 replaceStateSpy.calls.mostRecent();
 
             expect(
-                replaceStateCall.args[0].__routtyUserState,
+                replaceStateCall.args[0],
             ).toEqual({ page: 'home' });
             expect(replaceStateCall.args[1]).toBe('');
             expect(replaceStateCall.args[2]).toBe('/');
@@ -2030,12 +2019,7 @@ idescribe('Router', () => {
             router.replace('/about', { from: 'test' });
             await delay(50);
             expect(replaceSpy).toHaveBeenCalledWith(
-                jasmine.objectContaining({
-                    __routtyEntryId: jasmine.any(Number),
-                    __routtyUserState: {
-                        from: 'test'
-                    }
-                }),
+                { from: 'test' },
                 '',
                 '/about'
             );

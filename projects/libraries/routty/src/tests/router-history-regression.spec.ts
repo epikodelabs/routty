@@ -153,8 +153,7 @@ idescribe('Router history rollback regressions', () => {
       .toBeFalse();
 
     expect(
-      window.history.state
-        .__routtyUserState,
+      window.history.state,
     ).toEqual({ session: 7 });
     expect(router.state.historyState)
       .toEqual({ session: 7 });
