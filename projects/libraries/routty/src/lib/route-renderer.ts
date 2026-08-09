@@ -101,6 +101,7 @@ function createScopedInjector(
 
 function createAngularComponent(
   appRef: ApplicationRef,
+  documentRef: Document,
   tokens: RouteRenderTokens,
   component: Type<unknown>,
   environmentInjector:
@@ -109,7 +110,7 @@ function createAngularComponent(
   context: RouteRenderContext,
 ): RenderedRouteNode {
   const host =
-    document.createElement(
+    documentRef.createElement(
       'route-host',
     );
 
@@ -269,6 +270,7 @@ function disposeLayers(
 
 export function composeAngularRouteView(
   appRef: ApplicationRef,
+  documentRef: Document,
   rootInjector:
     EnvironmentInjector,
   tokens: RouteRenderTokens,
@@ -308,6 +310,7 @@ export function composeAngularRouteView(
         const rendered =
           createAngularComponent(
             appRef,
+            documentRef,
             tokens,
             view.component,
             activeInjector,
@@ -399,6 +402,7 @@ export function composeAngularRouteView(
 
 export function composeAngularLeafRouteView(
   appRef: ApplicationRef,
+  documentRef: Document,
   rootInjector:
     EnvironmentInjector,
   tokens: RouteRenderTokens,
@@ -447,6 +451,7 @@ export function composeAngularLeafRouteView(
       const rendered =
         createAngularComponent(
           appRef,
+          documentRef,
           tokens,
           leaf.component,
           parentInjector,
