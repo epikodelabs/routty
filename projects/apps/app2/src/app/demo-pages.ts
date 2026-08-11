@@ -855,8 +855,8 @@ export class ProjectPage {
     return (this.data()['highlights'] as readonly string[] | undefined) ?? [];
   }
 
-  protected openReports(): void {
-    void this.router.navigate({ name: 'reports' });
+  protected async openReports(): Promise<void> {
+    await this.router.navigate({ name: 'reports' });
   }
 }
 

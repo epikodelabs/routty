@@ -226,13 +226,13 @@ idescribe('Router atomic configuration replacement', () => {
       }),
     ).toBeTrue();
 
-    await expectAsync(navigation)
-      .toBeResolvedTo(false);
-
     loading.resolve({
       component: () =>
         document.createTextNode('Slow'),
     });
+
+    await expectAsync(navigation)
+      .toBeResolvedTo(false);
 
     expect(router.state.current).toBeNull();
     expect(router.routeVersion).toBe(1);

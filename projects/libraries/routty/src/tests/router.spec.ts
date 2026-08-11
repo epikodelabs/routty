@@ -10,9 +10,34 @@ function unwrapTestComponent<T>(value: T | { default: T }): T {
 function delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+async function waitForCondition(
+    predicate: () => boolean,
+    timeoutMs = 500,
+    stepMs = 10,
+): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+        if (predicate()) {
+            return;
+        }
+
+        await delay(stepMs);
+    }
+
+    throw new Error('Timed out waiting for condition.');
+}
 // Helper function to create test components
 function createComponent(text: string): () => Node {
     return () => document.createTextNode(text);
+}
+function runViewTransitionCallback(callback: () => void | PromiseLike<void>): { finished: Promise<void> } {
+    return {
+        finished: Promise.resolve()
+            .then(() => callback())
+            .then(() => undefined),
+    };
 }
 function dispatchAnchorClick(target: HTMLAnchorElement, init: MouseEventInit = {}): boolean {
     const event = new MouseEvent('click', {
@@ -122,8 +147,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/about');
-            await delay(50);
+            await router.navigate('/about');
             expect(router.state.current?.path).toBe('/about');
             expect(router.state.current?.config.path).toBe('about');
             expect(outlet.textContent).toBe('About');
@@ -172,8 +196,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/');
-            await delay(50);
+            await router.navigate('/');
             expect(router.state.current?.path).toBe('/');
             expect(outlet.textContent).toBe('Home');
         });
@@ -190,8 +213,7 @@ idescribe('Router', () => {
             router = createRouter(config);
             router.start();
             const replaceSpy = spyOn(window.history, 'replaceState').and.callThrough();
-            router.navigate('/about', { replace: true });
-            await delay(50);
+            await router.navigate('/about', { replace: true });
             expect(replaceSpy).toHaveBeenCalled();
             expect(router.state.current?.path).toBe('/about');
         });
@@ -208,8 +230,7 @@ idescribe('Router', () => {
             router = createRouter(config);
             router.start();
             const pushStateSpy = spyOn(window.history, 'pushState').and.callThrough();
-            router.navigate('/about', { state: { from: 'test' } });
-            await delay(50);
+            await router.navigate('/about', { state: { from: 'test' } });
             expect(pushStateSpy).toHaveBeenCalledWith(
                 { from: 'test' },
                 '',
@@ -251,8 +272,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('https://example.com');
-            await delay(10);
+            await router.navigate('https://example.com');
             expect(navigateExternal).toHaveBeenCalledWith(new URL('https://example.com/'));
         });
         it('should handle navigation with query parameters', async () => {
@@ -266,8 +286,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/?foo=bar&baz=qux');
-            await delay(50);
+            await router.navigate('/?foo=bar&baz=qux');
             expect(router.state.query).toEqual({ foo: 'bar', baz: 'qux' });
         });
         it('should handle navigation with hash', async () => {
@@ -281,8 +300,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/#section');
-            await delay(50);
+            await router.navigate('/#section');
             expect(router.state.current?.url.hash).toBe('#section');
         });
         it('should ignore an active URL without touching history when configured', async () => {
@@ -371,8 +389,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/users/123');
-            await delay(50);
+            await router.navigate('/users/123');
             expect(router.state.current?.path).toBe('/users/123');
             expect(router.state.current?.params).toEqual({ id: '123' });
             expect(router.state.current?.config.path).toBe('users/:id');
@@ -393,8 +410,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/users/hello%20world');
-            await delay(50);
+            await router.navigate('/users/hello%20world');
             expect(router.state.current?.params).toEqual({ id: 'hello world' });
         });
         it('should match wildcard routes', async () => {
@@ -413,8 +429,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/non-existent');
-            await delay(50);
+            await router.navigate('/non-existent');
             expect(router.state.current?.config.path).toBe('**');
             expect(outlet.textContent).toBe('404');
         });
@@ -469,8 +484,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/protected');
-            await delay(50);
+            await router.navigate('/protected');
             expect(router.state.current?.path).toBe('/protected');
             expect(outlet.textContent).toBe('Protected');
         });
@@ -490,8 +504,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/protected');
-            await delay(50);
+            await router.navigate('/protected');
             expect(router.state.current).toBeNull();
             expect(router.state.pending).toBeFalse();
         });
@@ -527,8 +540,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/old');
-            await delay(100);
+            await router.navigate('/old');
             expect(router.state.current?.path).toBe('/new');
             expect(outlet.textContent).toBe('New');
         });
@@ -548,8 +560,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/old');
-            await delay(100);
+            await router.navigate('/old');
             expect(router.state.current?.path).toBe('/new');
             expect(outlet.textContent).toBe('New');
         });
@@ -575,8 +586,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/async');
-            await delay(50);
+            await router.navigate('/async');
             expect(router.state.current?.path).toBe('/async');
             expect(outlet.textContent).toBe('Async');
         });
@@ -601,8 +611,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/guarded');
-            await delay(50);
+            await router.navigate('/guarded');
             expect(order).toEqual(['first', 'second']);
             expect(router.state.current?.path).toBe('/guarded');
         });
@@ -628,8 +637,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/guarded');
-            await delay(50);
+            await router.navigate('/guarded');
             expect(order).toEqual(['first', 'second']);
             expect(router.state.current).toBeNull();
         });
@@ -650,8 +658,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/protected');
-            await delay(50);
+            await router.navigate('/protected');
             expect(router.state.current?.path).toBe('/protected');
         });
         it('should block navigation when canDeactivate returns false', async () => {
@@ -670,10 +677,8 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/edit');
-            await delay(50);
-            router.navigate('/other');
-            await delay(50);
+            await router.navigate('/edit');
+            await router.navigate('/other');
             expect(router.state.current?.path).toBe('/edit');
             expect(outlet.textContent).toBe('Edit');
             expect(router.state.error).toBeNull();
@@ -695,10 +700,8 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/edit');
-            await delay(50);
-            router.navigate('/other');
-            await delay(100);
+            await router.navigate('/edit');
+            await router.navigate('/other');
             expect(router.state.current?.path).toBe('/confirm');
             expect(outlet.textContent).toBe('Confirm');
         });
@@ -744,8 +747,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/user');
-            await delay(50);
+            await router.navigate('/user');
             expect(router.state.current?.data).toEqual({
                 userId: 123,
                 userName: 'Alice'
@@ -771,8 +773,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/async-data');
-            await delay(50);
+            await router.navigate('/async-data');
             expect(router.state.current?.data).toEqual({
                 data: { id: 1, name: 'Async' }
             });
@@ -795,8 +796,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/merged');
-            await delay(50);
+            await router.navigate('/merged');
             expect(router.state.current?.data).toEqual({
                 static: 'static-value',
                 dynamic: 'dynamic-value'
@@ -822,8 +822,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/user');
-            await delay(50);
+            await router.navigate('/user');
             expect(router.state.current?.data).toEqual({
                 userId: 123
             });
@@ -844,8 +843,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/old');
-            await delay(100);
+            await router.navigate('/old');
             expect(router.state.current?.path).toBe('/new');
             expect(outlet.textContent).toBe('New Page');
         });
@@ -869,8 +867,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/users/123');
-            await delay(100);
+            await router.navigate('/users/123');
             expect(router.state.current?.path).toBe('/profiles/123');
             expect(router.state.current?.params).toEqual({ id: '123' });
         });
@@ -894,8 +891,8 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/a');
-            await delay(200);
+            await expectAsync(router.navigate('/a'))
+                .toBeRejectedWithError(/Maximum redirect count of 3 exceeded/);
             expect(router.state.phase).toBeNull();
             expect(router.state.error).toBeDefined();
             expect((router.state.error as Error).message).toContain('Maximum redirect count');
@@ -916,8 +913,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/external');
-            await delay(50);
+            await router.navigate('/external');
             expect(navigateExternal).toHaveBeenCalledWith(new URL('https://example.com/'));
         });
     });
@@ -937,8 +933,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/lazy');
-            await delay(50);
+            await router.navigate('/lazy');
             expect(router.state.current?.path).toBe('/lazy');
             expect(outlet.textContent).toBe('Lazy Loaded');
         });
@@ -960,8 +955,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/lazy-default');
-            await delay(50);
+            await router.navigate('/lazy-default');
             expect(outlet.textContent).toBe('Lazy Default');
         });
         it('should handle lazy loading errors', async () => {
@@ -979,8 +973,8 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/error');
-            await delay(50);
+            await expectAsync(router.navigate('/error'))
+                .toBeRejectedWithError('Load failed');
             expect(router.state.phase).toBeNull();
             expect(router.state.error).toBeDefined();
             expect((router.state.error as Error).message).toBe('Load failed');
@@ -1004,12 +998,14 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/about');
-            await delay(50);
-            router.navigate('/users/123');
-            await delay(50);
+            await router.navigate('/about');
+            await router.navigate('/users/123');
+            const popstate = new Promise<void>(resolve => {
+                window.addEventListener('popstate', () => resolve(), { once: true });
+            });
             router.back();
-            await delay(50);
+            await popstate;
+            await waitForCondition(() => router.state.current?.path === '/about');
             expect(router.state.current?.path).toBe('/about');
         });
         it('should handle forward navigation', async () => {
@@ -1029,14 +1025,20 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/about');
-            await delay(50);
-            router.navigate('/users/123');
-            await delay(50);
+            await router.navigate('/about');
+            await router.navigate('/users/123');
+            const backPopstate = new Promise<void>(resolve => {
+                window.addEventListener('popstate', () => resolve(), { once: true });
+            });
             router.back();
-            await delay(50);
+            await backPopstate;
+            await waitForCondition(() => router.state.current?.path === '/about');
+            const forwardPopstate = new Promise<void>(resolve => {
+                window.addEventListener('popstate', () => resolve(), { once: true });
+            });
             router.forward();
-            await delay(50);
+            await forwardPopstate;
+            await waitForCondition(() => router.state.current?.path === '/users/123');
             expect(router.state.current?.path).toBe('/users/123');
         });
         it('should handle popstate events', async () => {
@@ -1051,13 +1053,13 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/about');
-            await delay(50);
-            // Simulate popstate
+            await router.navigate('/about');
+            const popstate = new Promise<void>(resolve => {
+                window.addEventListener('popstate', () => resolve(), { once: true });
+            });
             window.history.back();
-            const popstateEvent = new PopStateEvent('popstate');
-            window.dispatchEvent(popstateEvent);
-            await delay(50);
+            await popstate;
+            await waitForCondition(() => router.state.current?.path === '/');
             expect(router.state.current?.path).toBe('/');
         });
         it('should scroll to the top after programmatic navigation when configured', async () => {
@@ -1115,7 +1117,7 @@ idescribe('Router', () => {
             });
             window.history.back();
             await popstate;
-            await delay(50);
+            await waitForCondition(() => router.state.current?.path === '/');
             expect(scrollToSpy).toHaveBeenCalledWith(30, 140);
             expect(router.state.current?.path).toBe('/');
         });
@@ -1159,10 +1161,8 @@ idescribe('Router', () => {
             };
             const original = transitionDocument.startViewTransition;
             const startViewTransition = jasmine.createSpy('startViewTransition')
-                .and.callFake((callback: () => void | PromiseLike<void>) => {
-                void callback();
-                return { finished: Promise.resolve() };
-            });
+                .and.callFake((callback: () => void | PromiseLike<void>) =>
+                runViewTransitionCallback(callback));
             transitionDocument.startViewTransition = startViewTransition;
             try {
                 router = createRouter({
@@ -1187,10 +1187,8 @@ idescribe('Router', () => {
             };
             const original = transitionDocument.startViewTransition;
             const startViewTransition = jasmine.createSpy('startViewTransition')
-                .and.callFake((callback: () => void | PromiseLike<void>) => {
-                void callback();
-                return { finished: Promise.resolve() };
-            });
+                .and.callFake((callback: () => void | PromiseLike<void>) =>
+                runViewTransitionCallback(callback));
             transitionDocument.startViewTransition = startViewTransition;
             try {
                 router = createRouter({
@@ -1222,10 +1220,8 @@ idescribe('Router', () => {
             };
             const original = transitionDocument.startViewTransition;
             const startViewTransition = jasmine.createSpy('startViewTransition')
-                .and.callFake((callback: () => void | PromiseLike<void>) => {
-                void callback();
-                return { finished: Promise.resolve() };
-            });
+                .and.callFake((callback: () => void | PromiseLike<void>) =>
+                runViewTransitionCallback(callback));
             transitionDocument.startViewTransition = startViewTransition;
             try {
                 router = createRouter({
@@ -1258,10 +1254,8 @@ idescribe('Router', () => {
             };
             const original = transitionDocument.startViewTransition;
             const startViewTransition = jasmine.createSpy('startViewTransition')
-                .and.callFake((callback: () => void | PromiseLike<void>) => {
-                void callback();
-                return { finished: Promise.resolve() };
-            });
+                .and.callFake((callback: () => void | PromiseLike<void>) =>
+                runViewTransitionCallback(callback));
             const predicate = jasmine.createSpy('predicate')
                 .and.callFake((context: {
                 from: {
@@ -1359,13 +1353,11 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/broken');
-            await delay(50);
+            await expectAsync(router.navigate('/broken'))
+                .toBeRejectedWithError(/no component/);
             expect(router.state.error).toBeDefined();
-            router.navigate('/');
-            await delay(50);
-            router.navigate('/blocked');
-            await delay(50);
+            await router.navigate('/');
+            await router.navigate('/blocked');
             expect(router.state.error).toBeNull();
             expect(router.state.current?.path).toBe('/');
         });
@@ -1484,8 +1476,7 @@ idescribe('Router', () => {
             router = createRouter(config);
             router.start();
             // Navigate to about first
-            router.navigate('/about');
-            await delay(50);
+            await router.navigate('/about');
             // Click on a hash link from the same page
             const link = document.createElement('a');
             link.href = '#section';
@@ -1510,8 +1501,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/about');
-            await delay(50);
+            await router.navigate('/about');
             expect(router.state.path).toBe('/about');
             expect(router.state.params).toEqual({});
             expect(router.state.query).toEqual({});
@@ -1532,8 +1522,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/app/about');
-            await delay(50);
+            await router.navigate('/app/about');
             expect(router.state.path).toBe('/about');
             expect(router.state.current?.path).toBe('/about');
             expect(router.state.current?.url.pathname).toBe('/app/about');
@@ -1557,10 +1546,10 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/async');
+            const navigation = router.navigate('/async');
             // Check that phase changes
             expect(router.state.phase).toBeDefined();
-            await delay(50);
+            await navigation;
             expect(router.state.phase).toBeNull();
         });
         it('should track pending state during navigation', async () => {
@@ -1583,10 +1572,10 @@ idescribe('Router', () => {
             router = createRouter(config);
             router.start();
             expect(router.state.pending).toBeFalse();
-            router.navigate('/async');
+            const navigation = router.navigate('/async');
             // Should be pending during navigation
             expect(router.state.pending).toBeTrue();
-            await delay(50);
+            await navigation;
             expect(router.state.pending).toBeFalse();
         });
         it('should expose error state on navigation failure', async () => {
@@ -1603,8 +1592,8 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/error');
-            await delay(50);
+            await expectAsync(router.navigate('/error'))
+                .toBeRejectedWithError('Component failed');
             expect(router.state.error).toBeDefined();
             expect((router.state.error as Error).message).toBe('Component failed');
         });
@@ -1683,9 +1672,10 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/slow');
+            const navigation = router.navigate('/slow');
             // Dispose while navigation is in progress
             router.dispose();
+            await expectAsync(navigation).toBeResolved();
             // The navigation should be cancelled
             expect(router.state.phase).toBeNull();
         });
@@ -1720,10 +1710,8 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/first');
-            await delay(50);
-            router.navigate('/second');
-            await delay(50);
+            await router.navigate('/first');
+            await router.navigate('/second');
             expect(disposedComponent).toBeTrue();
             expect(abortedSignal).toBeTrue();
             expect(attachedAtDisposal).toBeTrue();
@@ -1819,8 +1807,8 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/broken');
-            await delay(50);
+            await expectAsync(router.navigate('/broken'))
+                .toBeRejectedWithError(/no component/);
             expect(router.state.phase).toBeNull();
             expect(router.state.error).toBeDefined();
             expect((router.state.error as Error).message).toContain('no component');
@@ -1841,8 +1829,8 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/broken');
-            await delay(50);
+            await expectAsync(router.navigate('/broken'))
+                .toBeRejectedWithError(/no component/);
             expect(errorRendered).toBeTrue();
             expect(outlet.textContent).toContain('Custom Error');
         });
@@ -1860,12 +1848,11 @@ idescribe('Router', () => {
             router = createRouter(config);
             router.start();
             // Navigate to home first
-            router.navigate('/');
-            await delay(50);
+            await router.navigate('/');
             expect(outlet.textContent).toBe('Home');
             // Try to navigate to broken route
-            router.navigate('/broken');
-            await delay(50);
+            await expectAsync(router.navigate('/broken'))
+                .toBeRejectedWithError(/no component/);
             expect(outlet.textContent).toContain('Page failed to load');
             expect(router.state.current).toBeNull();
             expect(router.state.error).toBeDefined();
@@ -1899,10 +1886,10 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/slow');
+            const slowNavigation = router.navigate('/slow');
             await started;
-            router.navigate('/');
-            await delay(50);
+            await router.navigate('/');
+            await expectAsync(slowNavigation).toBeResolvedTo(false);
             expect(router.state.error).toBeNull();
             expect(router.state.current?.path).toBe('/');
         });
@@ -1925,8 +1912,8 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/error');
-            await delay(50);
+            await expectAsync(router.navigate('/error'))
+                .toBeRejectedWithError('Guard failed');
             expect(router.state.error).toBeDefined();
             expect((router.state.error as Error).message).toBe('Guard failed');
         });
@@ -1946,14 +1933,14 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/error');
-            await delay(50);
+            await expectAsync(router.navigate('/error'))
+                .toBeRejectedWithError('Prepare failed');
             expect(router.state.error).toBeDefined();
             expect((router.state.error as Error).message).toBe('Prepare failed');
         });
     });
     describe('tracing', () => {
-        it('should log debug messages when tracing is enabled', () => {
+        it('should log debug messages when tracing is enabled', async () => {
             const debugSpy = console.debug as jasmine.Spy;
             debugSpy.calls.reset();
             const config: VanillaRouterConfig = {
@@ -1964,11 +1951,12 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/about');
+            const navigation = router.navigate('/about');
             router.dispose();
+            await expectAsync(navigation).toBeResolved();
             expect(debugSpy).toHaveBeenCalled();
         });
-        it('should not log debug messages when tracing is disabled', () => {
+        it('should not log debug messages when tracing is disabled', async () => {
             const debugSpy = console.debug as jasmine.Spy;
             debugSpy.calls.reset();
             const config: VanillaRouterConfig = {
@@ -1979,8 +1967,9 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/about');
+            const navigation = router.navigate('/about');
             router.dispose();
+            await expectAsync(navigation).toBeResolved();
             expect(debugSpy).not.toHaveBeenCalled();
         });
     });
@@ -1998,8 +1987,7 @@ idescribe('Router', () => {
             router = createRouter(config);
             router.start();
             const replaceSpy = spyOn(window.history, 'replaceState').and.callThrough();
-            router.replace('/about');
-            await delay(50);
+            await router.replace('/about');
             expect(replaceSpy).toHaveBeenCalled();
             expect(router.state.current?.path).toBe('/about');
         });
@@ -2016,8 +2004,7 @@ idescribe('Router', () => {
             router = createRouter(config);
             router.start();
             const replaceSpy = spyOn(window.history, 'replaceState').and.callThrough();
-            router.replace('/about', { from: 'test' });
-            await delay(50);
+            await router.replace('/about', { from: 'test' });
             expect(replaceSpy).toHaveBeenCalledWith(
                 { from: 'test' },
                 '',
@@ -2040,8 +2027,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/app/about');
-            await delay(50);
+            await router.navigate('/app/about');
             expect(router.state.current?.path).toBe('/about');
             expect(router.state.current?.url.pathname).toBe('/app/about');
             expect(outlet.textContent).toBe('About');
@@ -2073,8 +2059,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/about');
-            await delay(50);
+            await router.navigate('/about');
             expect(router.state.current?.path).toBe('/about');
             expect(outlet.textContent).toBe('About');
         });
@@ -2093,8 +2078,7 @@ idescribe('Router', () => {
             router = createRouter(config);
             router.start();
             await delay(50);
-            router.navigate('settings');
-            await delay(50);
+            await router.navigate('settings');
             expect(router.state.current?.path).toBe('/dashboard/settings');
             expect(router.state.current?.url.pathname).toBe('/dashboard/settings');
             expect(outlet.textContent).toBe('Settings');
@@ -2126,8 +2110,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('child');
-            await delay(50);
+            await router.navigate('child');
             expect(router.state.current?.path).toBe('/section/child');
             expect(router.state.current?.url.pathname).toBe('/app/section/child');
             expect(outlet.textContent).toBe('Child');
@@ -2149,8 +2132,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/non-existent');
-            await delay(50);
+            await router.navigate('/non-existent');
             expect(notFoundCalled).toBeTrue();
             expect(outlet.textContent).toBe('Custom 404');
             expect(router.state.phase).toBeNull();
@@ -2168,8 +2150,7 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/non-existent');
-            await delay(50);
+            await router.navigate('/non-existent');
             expect(outlet.textContent).toBe('404 — Page Not Found');
         });
         it('should clear the current route when rendering not found', async () => {
@@ -2183,11 +2164,9 @@ idescribe('Router', () => {
             };
             router = createRouter(config);
             router.start();
-            router.navigate('/');
-            await delay(50);
+            await router.navigate('/');
             expect(router.state.current?.path).toBe('/');
-            router.navigate('/non-existent');
-            await delay(50);
+            await router.navigate('/non-existent');
             expect(router.state.current).toBeNull();
             expect(router.state.path).toBe('');
         });
@@ -2282,7 +2261,8 @@ idescribe('Router', () => {
                 commit: () => undefined
             });
 
-            expect(await router.navigate('/project/42')).toBeFalse();
+            await expectAsync(router.navigate('/project/42'))
+                .toBeRejectedWithError(/cannot define parseParams or parseQuery/);
             expect((router.state.error as Error).message)
                 .toContain('cannot define parseParams or parseQuery');
         });
@@ -2334,7 +2314,8 @@ idescribe('Router', () => {
 
             expect(await router.navigate('/stable')).toBeTrue();
             expect(primary.textContent).toBe('Stable');
-            expect(await router.navigate('/broken')).toBeFalse();
+            await expectAsync(router.navigate('/broken'))
+                .toBeRejectedWithError('Sidebar failed');
             expect(router.state.current?.path).toBe('/stable');
             expect(primary.textContent).toBe('Stable');
             expect((router.state.error as Error).message).toBe('Sidebar failed');
@@ -2365,7 +2346,8 @@ idescribe('Router', () => {
                 commit: () => { throw new Error('Commit failed'); }
             });
 
-            expect(await router.navigate('/project')).toBeFalse();
+            await expectAsync(router.navigate('/project'))
+                .toBeRejectedWithError('Commit failed');
             expect(destroyed.length).toBe(2);
             expect((router.state.error as Error).message).toBe('Commit failed');
         });
@@ -2378,10 +2360,8 @@ idescribe('Router', () => {
             };
             const original = transitionDocument.startViewTransition;
             const startViewTransition = jasmine.createSpy('startViewTransition')
-                .and.callFake((callback: () => void | PromiseLike<void>) => {
-                void callback();
-                return { finished: Promise.resolve() };
-            });
+                .and.callFake((callback: () => void | PromiseLike<void>) =>
+                runViewTransitionCallback(callback));
             transitionDocument.startViewTransition = startViewTransition;
 
             try {
@@ -2464,3 +2444,5 @@ idescribe('Router', () => {
         });
     });
 });
+
+

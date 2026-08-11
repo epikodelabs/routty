@@ -43,12 +43,16 @@ const routes = [
   ]),
 ] as const satisfies NavigationTree;
 
-function assertNamedNavigation(router: Router<typeof routes>): void {
-  void router.navigateTo.dashboard({
-    params: { projectId: 123 },
-  });
+function assertNavigationPromise(_navigation: Promise<boolean>): void {}
 
-  void router.navigateTo.dashboard({
+function assertHrefValue(_href: string | null): void {}
+
+function assertNamedNavigation(router: Router<typeof routes>): void {
+  assertNavigationPromise(router.navigateTo.dashboard({
+    params: { projectId: 123 },
+  }));
+
+  assertNavigationPromise(router.navigateTo.dashboard({
     params: { projectId: 123 },
     query: {
       tab: 'settings',
@@ -56,21 +60,21 @@ function assertNamedNavigation(router: Router<typeof routes>): void {
       filters: ['a', 'b'],
       draft: true,
     },
-  });
+  }));
 
-  void router.navigateTo.audit({
+  assertNavigationPromise(router.navigateTo.audit({
     params: { entryId: 'evt-42' },
-  });
+  }));
 
   // @ts-expect-error schema-less path parameters remain strings
-  void router.navigateTo.audit({ params: { entryId: 42 } });
+  assertNavigationPromise(router.navigateTo.audit({ params: { entryId: 42 } }));
 
   // @ts-expect-error literal path requires entryId
-  void router.navigateTo.audit({ params: {} });
+  assertNavigationPromise(router.navigateTo.audit({ params: {} }));
 
-  void router.navigateTo.settings({
+  assertNavigationPromise(router.navigateTo.settings({
     query: { section: 'billing' },
-  });
+  }));
 
   const href = router.hrefTo.dashboard({
     params: { projectId: 123 },
@@ -78,10 +82,10 @@ function assertNamedNavigation(router: Router<typeof routes>): void {
   });
 
   const typedHref: string | null = href;
-  void typedHref;
+  assertHrefValue(typedHref);
 
   // @ts-expect-error route name must exist in the configured layout tree
-  void router.navigateTo.missing();
+  assertNavigationPromise(router.navigateTo.missing());
 }
 
 describe('typed routes typings', () => {

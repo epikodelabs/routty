@@ -427,10 +427,11 @@ export class IntroPage {
 
   protected openWorkspace(
     projectId = this.currentUser().homeProjectId,
-  ): void {
+  ): Promise<void> {
     const activeUser = this.currentUser();
 
-    void this.router.navigate(
+    return this.router
+      .navigate(
       {
         name: 'workspace',
         params: { projectId },
@@ -448,7 +449,8 @@ export class IntroPage {
           userId: activeUser.id,
         },
       },
-    );
+    )
+      .then(() => undefined);
   }
 }
 
@@ -866,14 +868,16 @@ export class WorkspacePage {
     return (this.data()['snapshot'] as WorkspaceSnapshot | undefined) ?? null;
   }
 
-  protected openEditor(): void {
+  protected openEditor(): Promise<void> {
     const activeUser = this.session.currentUser();
 
-    void this.router.navigate({
-      name: 'editor',
-      params: { draftId: activeUser.favoriteDraftId },
-      query: { mode: 'review' },
-    });
+    return this.router
+      .navigate({
+        name: 'editor',
+        params: { draftId: activeUser.favoriteDraftId },
+        query: { mode: 'review' },
+      })
+      .then(() => undefined);
   }
 
   protected updateHistory(): void {
@@ -1099,8 +1103,8 @@ export class EditorPage {
     );
   }
 
-  protected goReports(): void {
-    void this.router.navigate({ name: 'reports' });
+  protected goReports(): Promise<void> {
+    return this.router.navigate({ name: 'reports' }).then(() => undefined);
   }
 }
 

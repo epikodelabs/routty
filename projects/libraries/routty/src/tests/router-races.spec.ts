@@ -95,13 +95,13 @@ idescribe('Router mutation races', () => {
       ]),
     ).toBeTrue();
 
-    await expectAsync(navigation)
-      .toBeResolvedTo(false);
-
     loading.resolve({
       component: () =>
         document.createTextNode('Slow'),
     });
+
+    await expectAsync(navigation)
+      .toBeResolvedTo(false);
 
     await delay();
 
@@ -131,8 +131,6 @@ idescribe('Router mutation races', () => {
 
     const second = router.navigate('/fast');
 
-    await expectAsync(first)
-      .toBeResolvedTo(false);
     await expectAsync(second)
       .toBeResolvedTo(true);
 
@@ -143,6 +141,9 @@ idescribe('Router mutation races', () => {
       component: () =>
         document.createTextNode('Slow'),
     });
+
+    await expectAsync(first)
+      .toBeResolvedTo(false);
 
     await delay();
 
