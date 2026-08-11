@@ -231,6 +231,11 @@ export interface Router {
   start(): void;
   stop(): void;
   dispose(): void;
+  /**
+   * Resolves true after a committed navigation, false for expected negative
+   * outcomes (blocked, not found, cancelled, or ignored), and rejects when
+   * navigation execution itself fails.
+   */
   navigate(target: string | URL, options?: NavigationOptions): Promise<boolean>;
   replace(target: string | URL, state?: unknown): Promise<boolean>;
   revalidate(): Promise<boolean>;
@@ -322,6 +327,7 @@ function readHistoryStateEnvelope(
 interface NavigationCompletion {
   settled: boolean;
   resolve(success: boolean): void;
+  reject(error: unknown): void;
 }
 
 interface NavigationRequest {
@@ -801,22 +807,26 @@ export function createRouter(config: RouterConfig): Router {
     return true;
   }
 
-  function runAfterEnterTransitions(
+  async function runAfterEnterTransitions(
     from: ActivatedRoute | null,
     to: ActivatedRoute,
-  ): void {
+  ): Promise<void> {
     const handlers = collectTransitionPhase('afterEnter', from, to);
 
-    for (const handler of handlers) {
-      void Promise.resolve(
-        executeTransition(handler, {
-          from,
-          to,
-          signal: new AbortController().signal,
-          redirectCount: 0,
-        }),
-      ).catch(error => trace('afterEnter transition failed', error));
-    }
+    await Promise.all(
+      handlers.map(async (handler) => {
+        try {
+          await executeTransition(handler, {
+            from,
+            to,
+            signal: new AbortController().signal,
+            redirectCount: 0,
+          });
+        } catch (error) {
+          trace('afterEnter transition failed', error);
+        }
+      }),
+    );
   }
 
   function createStatusRoute(url: URL): ActivatedRoute {
@@ -1066,10 +1076,10 @@ export function createRouter(config: RouterConfig): Router {
       : viewTransitions;
   }
 
-  function runWithViewTransition(
+  async function runWithViewTransition(
     context: ViewTransitionContext,
     action: () => void,
-  ): void {
+  ): Promise<void> {
     if (!shouldUseViewTransition(context)) {
       action();
       return;
@@ -1093,11 +1103,11 @@ export function createRouter(config: RouterConfig): Router {
     }
 
     try {
-      void Promise.resolve(
+      await Promise.resolve(
         startViewTransition.call(transitionDocument, () => action()).finished,
-      ).catch(error => trace('View transition failed', error));
+      );
     } catch (error) {
-      trace('View transition setup failed', error);
+      trace('View transition failed', error);
       action();
     }
   }
@@ -1108,10 +1118,12 @@ export function createRouter(config: RouterConfig): Router {
 
   function createCompletion(): { completion: NavigationCompletion; promise: Promise<boolean> } {
     let resolve!: (success: boolean) => void;
-    const promise = new Promise<boolean>(completion => {
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<boolean>((completion, failure) => {
       resolve = completion;
+      reject = failure;
     });
-    return { completion: { settled: false, resolve }, promise };
+    return { completion: { settled: false, resolve, reject }, promise };
   }
 
   function settleRequest(request: NavigationRequest, success: boolean): void {
@@ -1120,13 +1132,19 @@ export function createRouter(config: RouterConfig): Router {
     request.completion.resolve(success);
   }
 
+  function failRequest(request: NavigationRequest, error: unknown): void {
+    if (request.completion.settled) return;
+    request.completion.settled = true;
+    request.completion.reject(error);
+  }
+
   function cancelActiveNavigation(): void {
     activeController?.abort();
     activeController = null;
     if (requestState) settleRequest(requestState, false);
   }
 
-  function createRequest(
+  async function createRequest(
     url: URL,
     matchUrl: URL,
     redirectCount: number,
@@ -1151,8 +1169,8 @@ export function createRouter(config: RouterConfig): Router {
 
     const controller = new AbortController();
     activeController = controller;
-    void run(request, controller.signal);
-    return pending?.promise ?? Promise.resolve(false);
+    await run(request, controller.signal);
+    return await (pending?.promise ?? Promise.resolve(false));
   }
 
   function requestNavigation(
@@ -1307,7 +1325,7 @@ export function createRouter(config: RouterConfig): Router {
 
     preloadQueued = true;
 
-    const run = () => {
+    const run = async (): Promise<void> => {
       preloadIdleId = null;
       preloadTimeoutId = null;
 
@@ -1316,11 +1334,17 @@ export function createRouter(config: RouterConfig): Router {
         return;
       }
 
-      void preload();
+      try {
+        await preload();
+      } catch (error) {
+        trace('Preloading failed', error);
+      }
     };
 
     if (preloading === 'eager') {
-      queueMicrotask(run);
+      queueMicrotask(async () => {
+        await run();
+      });
       return;
     }
 
@@ -1329,11 +1353,15 @@ export function createRouter(config: RouterConfig): Router {
     }) | null)?.requestIdleCallback;
 
     if (typeof requestIdle === 'function') {
-      preloadIdleId = requestIdle(run);
+      preloadIdleId = requestIdle(async () => {
+        await run();
+      });
       return;
     }
 
-    preloadTimeoutId = browserWindow?.setTimeout(run, 0) ?? null;
+    preloadTimeoutId = browserWindow?.setTimeout(async () => {
+      await run();
+    }, 0) ?? null;
   }
 
   async function runCanDeactivateGuards(
@@ -1744,7 +1772,7 @@ export function createRouter(config: RouterConfig): Router {
         }
         return;
       }
-      commit(result);
+      await commit(result);
     } catch (error) {
       if (signal.aborted || isAbortError(error)) return;
       const preparationError =
@@ -1758,7 +1786,18 @@ export function createRouter(config: RouterConfig): Router {
         preserveActive: preparationError?.preserveActive ?? false,
       };
       if (failure.request.id !== latestRequestId) return;
-      commit(failure);
+      try {
+        await commit(failure);
+      } catch (reportingError) {
+        // Error-state commitment must never strand the navigation promise.
+        // Preserve the original actionable failure for the caller.
+        trace('Failed to commit navigation error state', reportingError);
+        requestState = null;
+        navigationPhase = null;
+        errorState = failure.error;
+        failRequest(request, failure.error);
+        notifyStateChange();
+      }
     } finally {
       if (activeController?.signal === signal) {
         activeController = null;
@@ -1811,14 +1850,14 @@ export function createRouter(config: RouterConfig): Router {
           requestState = null;
           navigationPhase = null;
           errorState = null;
+          navigateExternal(
+            redirectUrl,
+          );
           settleRequest(
             request,
             true,
           );
           notifyStateChange();
-          navigateExternal(
-            redirectUrl,
-          );
           return;
         }
 
@@ -1863,7 +1902,7 @@ export function createRouter(config: RouterConfig): Router {
 
         dispatchRouterLocationChange();
 
-        void requestNavigation(
+        await requestNavigation(
           new URL(
             href,
             routerLocation().origin,
@@ -1880,7 +1919,7 @@ export function createRouter(config: RouterConfig): Router {
       if (
         deactivationResult === false
       ) {
-        commit({
+        await commit({
           type: 'blocked',
           request,
         });
@@ -1891,15 +1930,15 @@ export function createRouter(config: RouterConfig): Router {
       navigationPhase = null;
       errorState = null;
 
+      navigateExternal(
+        request.url,
+      );
       settleRequest(
         request,
         true,
       );
 
       notifyStateChange();
-      navigateExternal(
-        request.url,
-      );
     } catch (error) {
       if (
         signal.aborted ||
@@ -1915,11 +1954,20 @@ export function createRouter(config: RouterConfig): Router {
         return;
       }
 
-      commit({
-        type: 'error',
-        request,
-        error,
-      });
+      try {
+        await commit({
+          type: 'error',
+          request,
+          error,
+        });
+      } catch (reportingError) {
+        trace('Failed to commit navigation error state', reportingError);
+        requestState = null;
+        navigationPhase = null;
+        errorState = error;
+        failRequest(request, error);
+        notifyStateChange();
+      }
     } finally {
       if (
         activeController?.signal ===
@@ -1930,13 +1978,13 @@ export function createRouter(config: RouterConfig): Router {
     }
   }
 
-  function commit(result: NavigationResult): void {
+  async function commit(result: NavigationResult): Promise<void> {
     if (disposed || result.request.id !== latestRequestId) return;
 
     switch (result.type) {
       case 'success': {
         const previousRoute = currentState;
-        runWithViewTransition({
+        await runWithViewTransition({
           url: result.request.url,
           from: currentState,
           to: result.route,
@@ -2020,12 +2068,12 @@ export function createRouter(config: RouterConfig): Router {
         restoreScroll(result.request.historyUpdate);
         settleRequest(result.request, true);
         notifyStateChange();
-        runAfterEnterTransitions(previousRoute, result.route);
+        await runAfterEnterTransitions(previousRoute, result.route);
         return;
       }
       case 'redirect': {
         if (result.request.redirectCount >= maxRedirects) {
-          commit({
+          await commit({
             type: 'error',
             request: result.request,
             error: new Error(`Maximum redirect count of ${maxRedirects} exceeded`),
@@ -2038,7 +2086,7 @@ export function createRouter(config: RouterConfig): Router {
           url.origin !==
           routerLocation().origin
         ) {
-          void requestExternalNavigation(
+          await requestExternalNavigation(
             url,
             result.request.completion,
             result.request.historyUpdate,
@@ -2069,7 +2117,7 @@ export function createRouter(config: RouterConfig): Router {
         const historyUpdate = history.createUpdate(href, result.replace, historyState);
         browserWindow?.history[result.replace ? 'replaceState' : 'pushState'](historyUpdate.nextEntry?.state ?? historyState, '', href);
         dispatchRouterLocationChange();
-        void requestNavigation(
+        await requestNavigation(
           displayUrl,
           url,
           result.request.redirectCount + 1,
@@ -2091,7 +2139,7 @@ export function createRouter(config: RouterConfig): Router {
         return;
       }
       case 'not-found': {
-        runWithViewTransition({
+        await runWithViewTransition({
           url: result.request.url,
           from: currentState,
           to: null,
@@ -2130,28 +2178,37 @@ export function createRouter(config: RouterConfig): Router {
         restoreActiveUrl();
 
         if (!result.preserveActive) {
-          runWithViewTransition({
-            url: result.request.url,
-            from: currentState,
-            to: null,
-            phase: 'error',
-            routeConfig: null,
-            error: result.error,
-          }, () => {
-            if (renderError) {
-              renderError('', result.error, publicRouter);
-            } else {
-              const heading = browserDocument?.createElement('h1');
-              if (!heading) return;
-              heading.textContent = 'Page failed to load';
-              renderPrimaryNode(
-                heading,
-                createStatusRoute(result.request.url),
-              );
-            }
-
-            disposeAllRenders();
-          });
+          try {
+            await runWithViewTransition({
+              url: result.request.url,
+              from: currentState,
+              to: null,
+              phase: 'error',
+              routeConfig: null,
+              error: result.error,
+            }, () => {
+              try {
+                if (renderError) {
+                  renderError('', result.error, publicRouter);
+                } else {
+                  const heading = browserDocument?.createElement('h1');
+                  if (!heading) return;
+                  heading.textContent = 'Page failed to load';
+                  renderPrimaryNode(
+                    heading,
+                    createStatusRoute(result.request.url),
+                  );
+                }
+              } finally {
+                disposeAllRenders();
+              }
+            });
+          } catch (reportingError) {
+            // Error presentation is best-effort. Never replace the actionable
+            // navigation failure or leave its promise unsettled because an
+            // error renderer failed while reporting it.
+            trace('Navigation error renderer failed', reportingError);
+          }
         }
 
         history.rollbackUpdate(result.request.historyUpdate);
@@ -2163,31 +2220,35 @@ export function createRouter(config: RouterConfig): Router {
         errorState = result.error;
         trace('Navigation failed', result.error);
         restorePreviousScroll(result.request.historyUpdate);
-        settleRequest(result.request, false);
+        failRequest(result.request, result.error);
         notifyStateChange();
         return;
       }
     }
   }
 
-  function handlePopState(): void {
+  async function handlePopState(): Promise<void> {
     const historyUpdate = history.createPopStateUpdate(currentHref());
     const resolvedHref = historyUpdate.nextEntry?.href ?? currentHref();
     const displayUrl = new URL(resolvedHref, routerLocation().origin);
 
-    requestNavigation(
-      displayUrl,
-      resolveNavigationMatchUrl(
+    try {
+      await requestNavigation(
         displayUrl,
-        readBrowserHistoryState(),
-      ),
-      0,
-      undefined,
-      historyUpdate,
-    );
+        resolveNavigationMatchUrl(
+          displayUrl,
+          readBrowserHistoryState(),
+        ),
+        0,
+        undefined,
+        historyUpdate,
+      );
+    } catch (error) {
+      trace('Popstate navigation failed', error);
+    }
   }
 
-  function handleClick(event: MouseEvent): void {
+  async function handleClick(event: MouseEvent): Promise<void> {
     if (disposed || !started) return;
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
       return;
@@ -2212,7 +2273,12 @@ export function createRouter(config: RouterConfig): Router {
     }
 
     event.preventDefault();
-    navigate(url);
+
+    try {
+      await navigate(url);
+    } catch (error) {
+      trace('Intercepted navigation failed', error);
+    }
   }
 
   function navigate(target: string | URL, options: NavigationOptions = {}): Promise<boolean> {
@@ -2482,7 +2548,7 @@ export function createRouter(config: RouterConfig): Router {
 
     startRequestQueued = true;
 
-    queueMicrotask(() => {
+    queueMicrotask(async () => {
       startRequestQueued = false;
 
       if (
@@ -2494,16 +2560,20 @@ export function createRouter(config: RouterConfig): Router {
         return;
       }
 
-      void requestNavigation(
-        new URL(routerLocation().href),
-        resolveNavigationMatchUrl(
+      try {
+        await requestNavigation(
           new URL(routerLocation().href),
-          readBrowserHistoryState(),
-        ),
-        0,
-        undefined,
-        history.createDefaultUpdate(),
-      );
+          resolveNavigationMatchUrl(
+            new URL(routerLocation().href),
+            readBrowserHistoryState(),
+          ),
+          0,
+          undefined,
+          history.createDefaultUpdate(),
+        );
+      } catch (error) {
+        trace('Initial navigation failed', error);
+      }
     });
   }
 
