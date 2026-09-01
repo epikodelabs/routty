@@ -1,160 +1,366 @@
 # Choosing a Navigation Library
 
-The navigation ecosystem has three libraries with a shared philosophy but different navigation models.
+The navigation ecosystem consists of three libraries built around the same philosophy, but three different navigation models.
 
-They intentionally solve different problems.
+The most important question is not:
 
-All three libraries share the same design principles:
+> Which router has the features I need?
 
-- typed navigation
-- builder-style APIs
-- layouts
-- frames
-- typed params and query schemas
-- standalone-first Angular
-- function-based lifecycle
-- modern TypeScript
+It is:
 
-If you learn one, the others should feel familiar. The difference is how navigation itself is modeled.
+> How does my application naturally think about navigation?
+
+All three libraries share familiar concepts:
+
+* typed navigation
+* layouts
+* typed params and query schemas
+* standalone-first Angular
+* function-based lifecycle
+* modern TypeScript
+
+But they deliberately make different trade-offs.
 
 ---
 
 # Waypoint
 
-**General-purpose navigation for Angular applications.**
+**Navigation by destination.**
 
-Waypoint is the library most teams should reach for first.
+Waypoint is the general-purpose choice for Angular applications.
 
-It models applications around URLs and destinations while keeping navigation strongly typed and explicit.
+Its primary model is the familiar relationship:
 
-Use Waypoint when your application needs:
+```text
+URL → destination
+```
 
-- deep linking
-- browser history
-- layouts
-- eager server/client routing
-- typed URLs
-- route lifecycle
-- server-driven navigation
-- named outlets
+A URL identifies where the application should be, and Waypoint resolves the route, layouts, lifecycle, data, and outlets needed to render that destination.
 
-Waypoint is designed to feel familiar while reducing the amount of infrastructure required to describe a destination.
+Choose Waypoint when URLs are the natural identity of your application screens.
+
+Typical examples include:
+
+* dashboards
+* administration systems
+* SaaS applications
+* content applications
+* portals
+* e-commerce sites
+* applications with substantial deep linking
+
+Waypoint is particularly suitable when you need:
+
+* deep linking
+* browser history
+* layouts
+* lazy loading
+* typed URLs
+* named outlets
+* route lifecycle
+* SSR
+* server-driven navigation
+* server-authorized frontend delivery
+
+Waypoint can model complex navigation, but its center of gravity remains the **destination**.
+
+The fundamental question is:
+
+> Which destination does this URL represent?
 
 ---
 
 # Routty
 
-**A compact, typed Angular router with a flat runtime model.**
+**Navigation with the minimum machinery.**
 
-Routty is for applications that want URL-driven navigation, explicit layouts, typed route definitions, and a smaller runtime mental model.
+Routty is the deliberately small member of the family.
 
-Its core promise is simple:
+Its model is still URL-based:
 
-> Define routes once, then use those same definitions everywhere.
+```text
+URL → destination
+```
 
-In Routty, route definitions drive matching, rendering, guards, data preparation, typed params and query values, link generation, and named navigation helpers.
+but it avoids the infrastructure needed by the larger navigation systems.
 
-Choose Routty when you want:
+Routty uses a small eager route model and keeps the API intentionally narrow.
 
-- flat runtime navigation state
-- explicit layout composition
-- typed params and query values
-- function-based lifecycle beside the view
-- named navigation by route name
-- companion outlets attached to one primary destination
+Choose Routty when navigation is necessary but should not become an architectural subsystem.
 
-Routty is not trying to be the smallest possible router. It is trying to be a clear, compact router with strong typing and explicit composition.
+Typical examples include:
+
+* small applications
+* internal tools
+* prototypes
+* demos
+* libraries with embedded navigation
+* applications with a small, known route catalog
+
+Routty is a good fit when you value:
+
+* minimal API surface
+* eager routes
+* straightforward route tables
+* typed navigation
+* layouts
+* client and SSR execution
+* low conceptual overhead
+
+Routty is not a smaller Waypoint configuration.
+
+It deliberately leaves out Waypoint-class infrastructure such as protected route artifact delivery and server-controlled route ownership.
+
+The fundamental question is:
+
+> What's the simplest way to reach this destination?
 
 ---
 
 # Switchboard
 
-**Navigation as a graph.**
+**Navigation by transition.**
 
-Switchboard is not centered around URLs.
+Switchboard approaches navigation from the opposite direction.
 
-Instead, applications are described as states connected by transitions.
+Instead of making URLs the primary model, it describes an application as **frames connected by transitions**.
 
-Navigation becomes moving through a graph rather than matching paths.
-
-This model is particularly well suited for:
-
-- onboarding
-- checkout
-- installers
-- editors
-- workflow systems
-- kiosk applications
-- embedded applications
-- state-driven experiences
-
-Instead of asking:
-
-> Which URL should I navigate to?
-
-You ask:
-
-> Which state can I transition to?
-
----
-
-# Shared vocabulary
-
-Although the navigation models differ, the ecosystem deliberately shares the same language.
-
-```ts
-route(...)
-layout(...)
-redirect(...)
+```text
+current frame
+     ↓
+transition
+     ↓
+next frame
 ```
 
-Schemas are identical:
+A destination matters, but so does **how the application is allowed to reach it**.
 
-```ts
-s.string(...)
-s.number(...)
-s.boolean(...)
-s.array(...)
+This makes navigation itself part of the application model.
+
+Choose Switchboard when the valid transition from one state to another is more important than simply matching a URL.
+
+Typical examples include:
+
+* onboarding
+* checkout
+* installers
+* setup wizards
+* editors
+* approval workflows
+* business processes
+* kiosk applications
+* embedded applications
+* state-driven experiences
+
+For example, a checkout application might naturally be:
+
+```text
+cart
+  ↓ checkout
+address
+  ↓ continue
+payment
+  ↓ authorize
+confirmation
 ```
 
-Lifecycle concepts remain familiar.
+The important information is not merely that `/payment` exists.
 
-Moving between libraries should not require relearning the public API from scratch.
+The application cares that `payment` can be entered from an appropriate state, under the appropriate conditions, through a defined transition.
 
----
+Switchboard can still participate in URL navigation, browser history, SSR, and server-authorized frontend delivery. Those capabilities do not make it Waypoint.
 
-# Which library should I choose?
+Its center of gravity remains the **transition graph**.
 
-| If your application... | Choose |
-| ---------------------- | ------ |
-| is a typical Angular application | **Waypoint** |
-| wants flat URL routing with explicit composition | **Routty** |
-| is built around workflows or state transitions | **Switchboard** |
-
-Most applications should start with **Waypoint**.
-
-Choose **Routty** when you want client-owned URL routing with flat runtime state and a route definition that stays usable everywhere.
-
-Choose **Switchboard** when navigation itself is part of the application's business logic.
-
----
-
-# One philosophy, different models
-
-These libraries are not editions of the same router.
-
-Each explores a different way of thinking about navigation.
-
-Waypoint asks:
-
-> Which destination does this URL represent?
-
-Routty asks:
-
-> How do I use one eager route model on both server and client?
-
-Switchboard asks:
+The fundamental question is:
 
 > Which transition is valid from the current state?
 
-They share a common philosophy, but intentionally optimize for different problems.
+---
+
+# Waypoint or Switchboard?
+
+This is the most important distinction.
+
+Both are capable of supporting sophisticated Angular applications, SSR, and server-controlled frontend delivery.
+
+Choose between them based on what represents the application most naturally.
+
+### Waypoint
+
+```text
+URL
+ ↓
+route
+ ↓
+layouts
+ ↓
+destination
+```
+
+The destination is primary.
+
+Use it when you mostly think:
+
+> Go to `/projects/42/settings`.
+
+### Switchboard
+
+```text
+current frame
+      ↓
+transition
+      ↓
+next frame
+```
+
+The transition is primary.
+
+Use it when you mostly think:
+
+> Move this workflow from `editing` to `review`.
+
+A useful test is to imagine removing the URLs from your design.
+
+If the application structure becomes difficult to describe, it is probably a **Waypoint** application.
+
+If the application still makes perfect sense as states and transitions, **Switchboard** may be the better model.
+
+---
+
+# Where Routty fits
+
+Routty answers a different question.
+
+Waypoint versus Switchboard is primarily a choice of **navigation model**.
+
+Routty is primarily a choice of **complexity budget**.
+
+```text
+Need navigation?
+      │
+      ▼
+Is a small eager URL router enough?
+      │
+   yes ───────→ Routty
+      │
+      no
+      ▼
+What naturally identifies navigation?
+      │
+      ├── destination / URL ─────→ Waypoint
+      │
+      └── state / transition ────→ Switchboard
+```
+
+This is why Routty should not gradually accumulate every Waypoint or Switchboard capability.
+
+Its constraint is part of its purpose.
+
+---
+
+# Capability overview
+
+| Capability                          |      Routty      | Waypoint | Switchboard |
+| ----------------------------------- | :--------------: | :------: | :---------: |
+| Typed navigation                    |         ✓        |     ✓    |      ✓      |
+| Typed params/query                  |         ✓        |     ✓    |      ✓      |
+| Layouts                             |         ✓        |     ✓    |      ✓      |
+| Client navigation                   |         ✓        |     ✓    |      ✓      |
+| SSR                                 |         ✓        |     ✓    |      ✓      |
+| Lazy route model                    |         —        |     ✓    |      ✓      |
+| Named/secondary composition         |       Basic      |     ✓    |      ✓      |
+| Transition graph                    |         —        |     —    |  **Native** |
+| Server-driven navigation            |         —        |     ✓    |      ✓      |
+| Server-authorized frontend delivery |         —        |     ✓    |      ✓      |
+| Protected artifact boundaries       |         —        |     ✓    |      ✓      |
+| Minimal runtime/API                 | **Primary goal** |     —    |      —      |
+
+The table should not be read as a ranking.
+
+More checkmarks do not mean a better router.
+
+Routty intentionally has fewer concepts. Waypoint and Switchboard intentionally solve larger architectural problems.
+
+---
+
+# Quick decision
+
+| Your application is primarily...                                     | Choose          |
+| -------------------------------------------------------------------- | --------------- |
+| A small application with straightforward routes                      | **Routty**      |
+| A conventional URL/deep-link driven application                      | **Waypoint**    |
+| A workflow or state machine                                          | **Switchboard** |
+| A large SaaS/admin application                                       | **Waypoint**    |
+| An onboarding or setup wizard                                        | **Switchboard** |
+| A checkout with meaningful transition rules                          | **Switchboard** |
+| A content or documentation application                               | **Waypoint**    |
+| A small internal utility                                             | **Routty**      |
+| An editor where modes form a real state graph                        | **Switchboard** |
+| An application with protected frontend modules organized around URLs | **Waypoint**    |
+| An application with protected workflow/frame modules                 | **Switchboard** |
+
+---
+
+# Don't choose by feature count
+
+It can be tempting to think of the libraries as:
+
+```text
+Routty      → small
+Waypoint    → medium
+Switchboard → advanced
+```
+
+That is not the model.
+
+A better picture is:
+
+```text
+                     navigation model
+
+             destination            transition
+                 │                       │
+                 │                       │
+          ┌─────────────┐         ┌─────────────┐
+          │  Waypoint   │         │ Switchboard │
+          └─────────────┘         └─────────────┘
+                 │                       │
+                 └──── Waypoint-class ───┘
+                       infrastructure
+
+
+          ┌─────────────┐
+          │   Routty    │
+          └─────────────┘
+                 │
+          minimal URL routing
+```
+
+Waypoint and Switchboard are peers.
+
+They provide similarly serious infrastructure around fundamentally different models.
+
+Routty deliberately occupies the smaller design space.
+
+---
+
+# One philosophy, three models
+
+The libraries share ideas because moving between them should feel familiar.
+
+But they are not editions of one router.
+
+**Routty** asks:
+
+> What's the simplest way to reach this destination?
+
+**Waypoint** asks:
+
+> Which destination does this URL represent?
+
+**Switchboard** asks:
+
+> Which transition is valid from the current state?
+
+Choose the question that sounds most like your application.
