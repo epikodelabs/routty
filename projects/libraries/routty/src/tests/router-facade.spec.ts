@@ -4,8 +4,6 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import {
   layout,
-  lazyLayout,
-  lazyRoute,
   provideRouter,
   RouterOutlet,
   route,
@@ -146,41 +144,13 @@ describe('Router: flat routes and layouts', () => {
     expect(router.state.path).toBe('/admin/settings');
   });
 
-  it('renders an eager layout around a lazy leaf route', async () => {
+  it('uses eager route components for deterministic server and client routing', async () => {
     const routes = [
-      layout('/admin', ParentComponent, [lazyRoute('/lazy-child', async () => ChildComponent)]),
-    ] as const satisfies NavigationTree;
-
-    bootstrap(routes);
-    await navigate('/admin/lazy-child');
-
-    const content = getOutletContent();
-    expect(content).toContain('<h2>Parent</h2>');
-    expect(content).toContain('<h3>Child</h3>');
-  });
-
-  it('renders a lazy layout around an eager leaf route', async () => {
-    const routes = [
-      lazyLayout('/admin', async () => ParentComponent, [route('/child', ChildComponent)]),
+      layout('/admin', ParentComponent, [route('/child', ChildComponent)]),
     ] as const satisfies NavigationTree;
 
     bootstrap(routes);
     await navigate('/admin/child');
-
-    const content = getOutletContent();
-    expect(content).toContain('<h2>Parent</h2>');
-    expect(content).toContain('<h3>Child</h3>');
-  });
-
-  it('renders a lazy layout around a lazy leaf route', async () => {
-    const routes = [
-      lazyLayout('/admin', async () => ParentComponent, [
-        lazyRoute('/lazy-child', async () => ChildComponent),
-      ]),
-    ] as const satisfies NavigationTree;
-
-    bootstrap(routes);
-    await navigate('/admin/lazy-child');
 
     const content = getOutletContent();
     expect(content).toContain('<h2>Parent</h2>');
@@ -226,8 +196,7 @@ describe('Router: flat routes and layouts', () => {
   it('supports named outlets', async () => {
     const routes = [
       layout('/', ParentComponent, [
-        route('', HomeComponent),
-        route('', SettingsComponent, { outlet: 'sidebar' }),
+        route('', HomeComponent, { outlets: { sidebar: SettingsComponent } }),
       ]),
     ] as const satisfies NavigationTree;
 
@@ -248,8 +217,7 @@ describe('Router: flat routes and layouts', () => {
   it('connects named outlets declared inside a layout component', async () => {
     const routes = [
       layout('/app', ShellWithSidebarComponent, [
-        route('/child', ChildComponent),
-        route('/child', SettingsComponent, { outlet: 'sidebar' }),
+        route('/child', ChildComponent, { outlets: { sidebar: SettingsComponent } }),
       ]),
     ] as const satisfies NavigationTree;
 
@@ -265,10 +233,8 @@ describe('Router: flat routes and layouts', () => {
   it('keeps named outlet navigation working across layout re-renders', async () => {
     const routes = [
       layout('/app', ShellWithSidebarComponent, [
-        route('/child', ChildComponent),
-        route('/child', SettingsComponent, { outlet: 'sidebar' }),
-        route('/settings', SettingsComponent),
-        route('/settings', HomeComponent, { outlet: 'sidebar' }),
+        route('/child', ChildComponent, { outlets: { sidebar: SettingsComponent } }),
+        route('/settings', SettingsComponent, { outlets: { sidebar: HomeComponent } }),
       ]),
     ] as const satisfies NavigationTree;
 

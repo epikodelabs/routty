@@ -33,7 +33,7 @@ function validateCompiledRouteParams(
     return;
   }
 
-  const schema = route.paramsSchema;
+  const schema = route.params;
   if (!schema) {
     return;
   }
@@ -43,7 +43,7 @@ function validateCompiledRouteParams(
   for (const name of schemaNames) {
     if (!seen.has(name)) {
       throw new Error(
-        `paramsSchema declares "${name}", but compiled route "${path}" ` +
+        `params declares "${name}", but compiled route "${path}" ` +
         `does not contain ":${name}".`,
       );
     }
@@ -54,8 +54,8 @@ function validateCompiledRouteParams(
   for (const name of paramNames) {
     if (!declared.has(name)) {
       throw new Error(
-        `Compiled route "${path}" contains ":${name}", but paramsSchema ` +
-        `does not declare it. Declare every path parameter when paramsSchema is present.`,
+        `Compiled route "${path}" contains ":${name}", but params ` +
+        `does not declare it. Declare every path parameter when params is present.`,
       );
     }
   }
@@ -146,6 +146,21 @@ export function compileRoutes(
         : undefined,
       layouts,
     });
+
+    if (entry.kind === 'route' && entry.outlets) {
+      for (const [outlet, component] of Object.entries(entry.outlets)) {
+        output.push({
+          route: {
+            kind: 'route',
+            path: entry.path,
+            outlet,
+            component,
+          },
+          path,
+          layouts,
+        });
+      }
+    }
   }
 
   return output;
@@ -232,17 +247,14 @@ function validateRouteGroups(
         );
       }
 
-      if (outlet.route.paramsSchema || outlet.route.querySchema) {
-        throw new Error('Named outlet routes cannot define paramsSchema or querySchema.');
+      if (outlet.route.params || outlet.route.query) {
+        throw new Error('Named outlet routes cannot define params or query.');
       }
 
       if (outlet.route.viewTransition !== undefined) {
         throw new Error('Named outlet routes cannot define viewTransition.');
       }
 
-      if (outlet.route.preload !== undefined) {
-        throw new Error('Named outlet routes cannot define preload.');
-      }
     }
   }
 }

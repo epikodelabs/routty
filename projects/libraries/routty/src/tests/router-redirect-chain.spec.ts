@@ -1,9 +1,9 @@
 import {
   createRouter,
   type Route,
-  type VanillaRouter,
-  type VanillaRouterConfig,
-} from '@epikodelabs/routty';
+  type Router as VanillaRouter,
+  type RouterConfig as VanillaRouterConfig,
+} from '../lib/vanilla-router';
 
 import { idescribe } from './env.spec';
 import {

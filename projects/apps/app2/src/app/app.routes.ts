@@ -1,8 +1,6 @@
 import {
-  frame,
-  lazyRoute,
   layout,
-  redirectRoute,
+  redirect,
   route,
   s,
   type NavigationTree,
@@ -16,6 +14,7 @@ import {
   ProjectSidebarComponent,
   ReportsSidebarComponent,
 } from './demo-pages';
+import { ReportsPage } from './reports.page';
 
 const PROJECTS = new Map([
   [
@@ -40,11 +39,28 @@ const PROJECTS = new Map([
   ],
 ]);
 
-const projectRoute = route(
-  '/projects/:projectId',
-  frame(ProjectPage, {
-    prepare: [
-      context => {
+export const routes = [
+  route('/', IntroPage),
+  redirect(
+    '/legacy',
+    '/app/projects/101?tab=activity&filter=recent',
+  ),
+  layout('/app', AppShellComponent, [
+    redirect('', '/app/projects/101?tab=overview'),
+
+    route('/projects/:projectId', ProjectPage, {
+      name: 'project',
+      outlets: {
+        sidebar: ProjectSidebarComponent,
+      },
+      params: {
+        projectId: s.number({ min: 1 }),
+      },
+      query: {
+        tab: s.string('overview'),
+        filter: s.optional(s.string()),
+      },
+      prepare: context => {
         const projectId = Number(context.params['projectId'] ?? 0);
         const project =
           PROJECTS.get(projectId)
@@ -65,44 +81,15 @@ const projectRoute = route(
           ],
         };
       },
-    ],
-  }),
-  {
-    name: 'project',
-    paramsSchema: {
-      projectId: s.number({ min: 1 }),
-    },
-    querySchema: {
-      tab: s.string('overview'),
-      filter: s.optional(s.string()),
-    },
-  },
-);
+    }),
 
-export const routes = [
-  route('/', IntroPage),
-  redirectRoute(
-    '/legacy',
-    '/app/projects/101?tab=activity&filter=recent',
-  ),
-  layout('/app', AppShellComponent, [
-    redirectRoute('', '/app/projects/101?tab=overview'),
-    projectRoute,
-    route('/projects/:projectId', ProjectSidebarComponent, {
-      outlet: 'sidebar',
-    }),
-    lazyRoute(
-      '/reports',
-      () =>
-        import('./reports.page')
-          .then(module => module.ReportsPage),
-      {
-        name: 'reports',
+    route('/reports', ReportsPage, {
+      name: 'reports',
+      outlets: {
+        sidebar: ReportsSidebarComponent,
       },
-    ),
-    route('/reports', ReportsSidebarComponent, {
-      outlet: 'sidebar',
     }),
+
     route('/about', AboutPage, {
       name: 'about',
     }),

@@ -166,7 +166,7 @@ const sidebarStyles = `
       <p class="lede">
         This app is meant for real browser checks, not framework smoke tests.
         Use it to validate how Waypoint handles redirects, typed params,
-        query defaults, lazy routes, frame hooks, and grouped named outlets.
+        query defaults, eager SSR routes, frame hooks, and grouped named outlets.
       </p>
 
       <section class="hero-session">
@@ -237,7 +237,7 @@ const sidebarStyles = `
           </p>
         </article>
         <article class="scenario-card">
-          <strong>Frames and lazy routes</strong>
+          <strong>Frames and eager SSR routes</strong>
           <p>
             The admin and editor pages use frame lifecycle hooks, and the
             reports page is loaded lazily.
@@ -706,8 +706,8 @@ export class DemoShellComponent {
         },
       },
       {
-        label: 'Lazy reports',
-        description: 'Lazy component route paired with an eager sidebar outlet',
+        label: 'Reports',
+        description: 'Eager route paired with a coordinated sidebar outlet',
         target: {
           name: 'reports',
         },
@@ -1065,7 +1065,7 @@ export class SettingsSidebarComponent {}
 
       <div class="action-row">
         <button type="button" class="action-button" (click)="goReports()">
-          Leave for lazy reports
+          Leave for reports
         </button>
         <a
           class="action-link"
@@ -1184,7 +1184,7 @@ export class AdminSidebarComponent {}
     <section class="sidebar-card">
       <h3>Reports sidebar</h3>
       <p>
-        The sidebar is eager even though the primary reports page is lazy.
+        The sidebar and primary reports page are both eager and commit together.
       </p>
       <ul>
         <li>Check the first load after a hard refresh.</li>

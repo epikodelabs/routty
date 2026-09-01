@@ -8,14 +8,14 @@ import { RouterLink } from '@epikodelabs/routty';
     <section class="page">
       <header class="page-header">
         <div>
-          <p class="eyebrow">Lazy route</p>
+          <p class="eyebrow">Eager route</p>
           <h1>Reports</h1>
           <p class="lede">
             This page is loaded on demand inside the SSR sample to verify that
-            lazy primary routes still work cleanly with Routty and Angular SSR.
+            eager primary routes render through the same Routty catalog on server and client.
           </p>
         </div>
-        <span class="status-pill">code split</span>
+        <span class="status-pill">eager route</span>
       </header>
 
       <div class="page-grid">
@@ -32,7 +32,7 @@ import { RouterLink } from '@epikodelabs/routty';
           <h3>Why it matters</h3>
           <p>
             A dedicated SSR example should demonstrate more than static pages.
-            This route makes sure the app covers lazy loading in addition to
+            This route makes sure the app covers server/client routing in addition to
             typed params and coordinated outlets.
           </p>
         </article>

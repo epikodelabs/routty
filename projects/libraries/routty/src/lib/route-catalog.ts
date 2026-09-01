@@ -281,12 +281,6 @@ function validateRouteGroups(
         );
       }
 
-      if (outlet.preload !== undefined) {
-        throw new Error(
-          `Outlet "${name}" cannot define preload; the primary route owns group preloading`,
-        );
-      }
-
       if (outlet.viewTransition !== undefined) {
         throw new Error(
           `Outlet "${name}" cannot define viewTransition; the primary route owns the transition`,

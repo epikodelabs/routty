@@ -8,10 +8,9 @@ import {
   inject,
   runInInjectionContext,
   type Provider,
-  type Type,
 } from '@angular/core';
 
-import { runWithInjector, unwrapDefault } from './adapter-utils';
+import { runWithInjector } from './adapter-utils';
 
 import type { NamedNavigationTarget, NavigationTarget } from './navigation-targets';
 
@@ -24,9 +23,8 @@ import {
 } from './route-renderer';
 
 import type {
-  FramePrepareFn,
+  PrepareFn,
   MaybePromise,
-  FrameView,
   LayoutDefinition,
   LayoutOptions,
   RedirectRouteDefinition,
@@ -37,7 +35,6 @@ import type {
 } from './navigation-definitions';
 
 import type { TypedHref, TypedNavigate } from './typed-navigation';
-import type { RouteRuntime } from './route-runtime';
 
 import { OUTLET_ACTIVATE_EVENT, dispatchOutletLifecycleEvent } from './router-events';
 
@@ -62,7 +59,6 @@ import {
   type NavigationOptions,
   type NavigationTransitionDefinition,
   type PrepareRouteDataFn,
-  type PreloadingStrategy,
   type RedirectRoute,
   type RenderableRoute as RuntimeRenderableRoute,
   type Route,
@@ -79,7 +75,6 @@ export interface RouterOptions {
   readonly maxRedirects?: number;
   readonly onSameUrlNavigation?: 'ignore';
   readonly scrollRestoration?: ScrollRestorationMode;
-  readonly preloading?: PreloadingStrategy;
   readonly viewTransitions?: ViewTransitionsOption;
 }
 
@@ -108,43 +103,6 @@ const EMPTY_ROUTER_STATE: RouterState = Object.freeze({
   routeConfig: null,
 });
 
-const lazyComponents = new WeakMap<object, Promise<Type<unknown>>>();
-
-function loadComponent(owner: LayoutDefinition | RenderableRoute): Promise<Type<unknown>> {
-  if (owner.component) {
-    return Promise.resolve(owner.component);
-  }
-
-  if (!owner.loadComponent) {
-    return Promise.reject(new Error('A route view must define component or loadComponent.'));
-  }
-
-  let pending = lazyComponents.get(owner);
-
-  if (!pending) {
-    pending = Promise.resolve(owner.loadComponent())
-      .then((value) =>
-        unwrapDefault<Type<unknown>>(value as Type<unknown> | { readonly default: Type<unknown> }),
-      )
-      .then((component) => {
-        if (!component) {
-          throw new Error('Lazy component loader returned no component.');
-        }
-
-        return component;
-      })
-      .catch((error) => {
-        lazyComponents.delete(owner);
-
-        throw error;
-      });
-
-    lazyComponents.set(owner, pending);
-  }
-
-  return pending;
-}
-
 function snapshotRouterState(state: RouterState): RouterState {
   return Object.freeze({
     current: state.current ?? null,
@@ -168,7 +126,7 @@ function execute<TContext, TResult>(
   return runWithInjector(injector, handler, context);
 }
 
-function adaptFrameBeforeEnter(
+function adaptBeforeEnter(
   handler: CanActivateFn,
   injector: EnvironmentInjector,
 ): NavigationTransitionFn {
@@ -179,14 +137,12 @@ function adaptFrameBeforeEnter(
     });
 }
 
-function adaptFrameBeforeLeave(
+function adaptBeforeLeave(
   handler: CanDeactivateFn,
   injector: EnvironmentInjector,
 ): NavigationTransitionFn {
   return (transition) => {
-    if (!transition.from) {
-      return true;
-    }
+    if (!transition.from) return true;
 
     return execute(injector, handler, {
       ...transition.from,
@@ -196,55 +152,39 @@ function adaptFrameBeforeLeave(
   };
 }
 
-function adaptFramePrepare(
-  handler: FramePrepareFn,
+function adaptPrepare(
+  handler: PrepareFn,
   injector: EnvironmentInjector,
 ): PrepareRouteDataFn {
   return (route) => execute(injector, handler, route);
 }
 
-function adaptFrameAfterEnter(
+function adaptAfterEnter(
   handler: (route: ActivatedRoute) => MaybePromise<void>,
   injector: EnvironmentInjector,
 ): NavigationTransitionFn {
   return (transition) => execute(injector, handler, transition.to);
 }
 
-function collectEnterFrames(
-  layouts: readonly LayoutDefinition[],
-  route: RenderableRoute,
-): readonly FrameView[] {
-  return Object.freeze([
-    ...layouts.map((layout) => layout.frame).filter((frame): frame is FrameView => !!frame),
-    ...(route.frame ? [route.frame] : []),
-  ]);
+interface HookOwner {
+  readonly beforeEnter?: readonly ((context: any) => MaybePromise<any>)[];
+  readonly beforeLeave?: readonly ((context: any) => MaybePromise<any>)[];
+  readonly prepare?: readonly ((context: any) => MaybePromise<any>)[];
+  readonly afterEnter?: readonly ((context: any) => MaybePromise<any>)[];
 }
 
-function collectLeaveFrames(
-  layouts: readonly LayoutDefinition[],
-  route: RenderableRoute,
-): readonly FrameView[] {
-  const routeFrames = route.frame ? [route.frame] : [];
-  const layoutFrames = layouts
-    .map((layout) => layout.frame)
-    .filter((frame): frame is FrameView => !!frame)
-    .reverse();
-
-  return Object.freeze([...routeFrames, ...layoutFrames]);
-}
-
-function adaptFramePreparers(
-  frames: readonly FrameView[],
+function collectPreparers(
+  owners: readonly HookOwner[],
   injector: EnvironmentInjector,
 ): readonly PrepareRouteDataFn[] | undefined {
-  const handlers = frames.flatMap(
-    (frame) => frame.prepare?.map((handler) => adaptFramePrepare(handler, injector)) ?? [],
+  const handlers = owners.flatMap(
+    owner => owner.prepare?.map(handler => adaptPrepare(handler as PrepareFn, injector)) ?? [],
   );
 
   return handlers.length > 0 ? Object.freeze(handlers) : undefined;
 }
 
-function adaptFrameTransitions(
+function adaptTransitions(
   groups: readonly CompiledRouteGroup[],
   injector: EnvironmentInjector,
 ): readonly NavigationTransitionDefinition[] {
@@ -252,37 +192,27 @@ function adaptFrameTransitions(
 
   for (const group of groups) {
     const primaryRoute = group.primary.route;
+    if (primaryRoute.kind === 'redirect') continue;
 
-    if (primaryRoute.kind === 'redirect') {
-      continue;
-    }
+    const enterOwners: readonly HookOwner[] = [...group.layouts, primaryRoute];
+    const leaveOwners: readonly HookOwner[] = [primaryRoute, ...[...group.layouts].reverse()];
 
-    const renderableRoute = primaryRoute as RenderableRoute;
-    const enterFrames = collectEnterFrames(group.layouts, renderableRoute);
-    const leaveFrames = collectLeaveFrames(group.layouts, renderableRoute);
-
-    for (const current of enterFrames) {
-      if (!current.beforeEnter?.length && !current.afterEnter?.length) {
-        continue;
-      }
+    for (const owner of enterOwners) {
+      if (!owner.beforeEnter?.length && !owner.afterEnter?.length) continue;
 
       transitions.push({
-        to: (route) => route?.config.sourceRoute === primaryRoute,
-        beforeEnter: current.beforeEnter?.map((handler) =>
-          adaptFrameBeforeEnter(handler, injector),
-        ),
-        afterEnter: current.afterEnter?.map((handler) => adaptFrameAfterEnter(handler, injector)),
+        to: route => route?.config.sourceRoute === primaryRoute,
+        beforeEnter: owner.beforeEnter?.map(handler => adaptBeforeEnter(handler as CanActivateFn, injector)),
+        afterEnter: owner.afterEnter?.map(handler => adaptAfterEnter(handler as (route: ActivatedRoute) => MaybePromise<void>, injector)),
       });
     }
 
-    for (const current of leaveFrames) {
-      if (!current.beforeLeave?.length) {
-        continue;
-      }
+    for (const owner of leaveOwners) {
+      if (!owner.beforeLeave?.length) continue;
 
       transitions.push({
-        from: (route) => route?.config.sourceRoute === primaryRoute,
-        beforeLeave: current.beforeLeave.map((handler) => adaptFrameBeforeLeave(handler, injector)),
+        from: route => route?.config.sourceRoute === primaryRoute,
+        beforeLeave: owner.beforeLeave.map(handler => adaptBeforeLeave(handler as CanDeactivateFn, injector)),
       });
     }
   }
@@ -293,8 +223,8 @@ function adaptFrameTransitions(
 function adaptParamsParser(
   route: RenderableRoute,
   injector: EnvironmentInjector,
-): RouteRuntime['parseParams'] {
-  const schema = route.paramsSchema;
+): import('./vanilla-router').ParseRouteParams | undefined {
+  const schema = route.params;
   if (!schema) return undefined;
 
   return (params, _url, _signal) =>
@@ -304,33 +234,27 @@ function adaptParamsParser(
 function adaptQueryParser(
   route: RenderableRoute,
   injector: EnvironmentInjector,
-): RouteRuntime['parseQuery'] {
-  const schema = route.querySchema;
+): import('./vanilla-router').ParseRouteQuery | undefined {
+  const schema = route.query;
   if (!schema) return undefined;
 
   return (url, _signal) =>
     runInInjectionContext(injector, () => Promise.resolve(parseQueryRecord(schema, url)));
 }
 
-async function resolveViews(
+function resolveViews(
   layouts: readonly LayoutDefinition[],
   route: RenderableRoute,
-): Promise<readonly ResolvedRouteView[]> {
-  const resolvedLayouts = await Promise.all(
-    layouts.map(async (layout, index) => ({
-      component: await loadComponent(layout),
-      providers: (layout.providers ?? []).flat().filter((p) => p),
+): readonly ResolvedRouteView[] {
+  return Object.freeze([
+    ...layouts.map((layout, index) => ({
+      component: layout.component,
+      providers: (layout.providers ?? []).flat().filter(p => p),
       label: `LayoutDefinition(${layout.path || index})`,
     })),
-  );
-
-  const page = await loadComponent(route);
-
-  return Object.freeze([
-    ...resolvedLayouts,
     {
-      component: page,
-      providers: (route.providers ?? []).flat().filter((p) => p),
+      component: route.component,
+      providers: (route.providers ?? []).flat().filter(p => p),
       label: `RouteDefinition(${route.path})`,
     },
   ]);
@@ -399,27 +323,16 @@ function adaptRoute(
     outlet: route.outlet,
     sourceRoute: route,
     data: route.data,
-    preload: route.preload,
     viewTransition: route.viewTransition,
-
-    load: async () => {
-      const views = await resolveViews(layouts, route);
-
-      return {
-        component: route.outlet
-          ? composeAngularLeafRouteView(appRef, documentRef, injector, tokens, views)
-          : composeAngularRouteView(appRef, documentRef, injector, tokens, views),
-        prepare: [
-          ...(sharedPreparers ?? []),
-          ...(adaptFramePreparers(
-            route.frame ? [route.frame] : [],
-            injector,
-          ) ?? []),
-        ],
-        parseParams: adaptParamsParser(route, injector),
-        parseQuery: adaptQueryParser(route, injector),
-      };
-    },
+    component: route.outlet
+      ? composeAngularLeafRouteView(appRef, documentRef, injector, tokens, resolveViews(layouts, route))
+      : composeAngularRouteView(appRef, documentRef, injector, tokens, resolveViews(layouts, route)),
+    prepare: Object.freeze([
+      ...(sharedPreparers ?? []),
+      ...(collectPreparers([route], injector) ?? []),
+    ]),
+    parseParams: adaptParamsParser(route, injector),
+    parseQuery: adaptQueryParser(route, injector),
   };
 }
 
@@ -430,12 +343,7 @@ function adaptRoutes(
   injector: EnvironmentInjector,
 ): Route[] {
   return groups.map((group: CompiledRouteGroup) => {
-    const sharedPreparers = adaptFramePreparers(
-      group.layouts
-        .map((layout) => layout.frame)
-        .filter((frame): frame is FrameView => !!frame),
-      injector,
-    );
+    const sharedPreparers = collectPreparers(group.layouts, injector);
 
     const authoredPrimary =
       group.primary.route;
@@ -634,9 +542,7 @@ export class Router<TRoutes extends NavigationTree = any> {
 
       scrollRestoration: this.configuration.scrollRestoration,
 
-      preloading: this.configuration.preloading,
-
-      transitions: [...adaptFrameTransitions(this.registry.groups, this.injector)],
+      transitions: [...adaptTransitions(this.registry.groups, this.injector)],
 
       viewTransitions: this.configuration.viewTransitions,
 
@@ -787,10 +693,6 @@ export class Router<TRoutes extends NavigationTree = any> {
     this.requireEngine().updateHistoryState(state);
   }
 
-  preload(): Promise<void> {
-    return this.requireEngine().preload();
-  }
-
   dispose(): void {
     const engine = this.engine;
 
@@ -830,7 +732,7 @@ export class Router<TRoutes extends NavigationTree = any> {
     const path = interpolateNamedPath(
       record.fullPath,
       target.params ?? {},
-      record.route.kind === 'route' ? record.route.paramsSchema : undefined,
+      record.route.kind === 'route' ? record.route.params : undefined,
     );
 
     if (!path) {
@@ -838,8 +740,8 @@ export class Router<TRoutes extends NavigationTree = any> {
     }
 
     const query =
-      record.route.kind === 'route' && record.route.querySchema && target.query
-        ? serializeQuery(record.route.querySchema, target.query)
+      record.route.kind === 'route' && record.route.query && target.query
+        ? serializeQuery(record.route.query, target.query)
         : '';
 
     return this.resolveHref(`${path}${query}`);
@@ -927,4 +829,4 @@ export function provideRouter<const TRoutes extends NavigationTree>(
 
 export { type LayoutOptions, type RouteOptions };
 
-export { layout, lazyLayout, lazyRoute, redirectRoute, route } from './route-builders';
+export { layout, redirect, route } from './route-builders';

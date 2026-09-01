@@ -1,7 +1,7 @@
 import {
   createRouter,
-  type VanillaRouter,
-} from '@epikodelabs/routty';
+  type Router as VanillaRouter,
+} from '../lib/vanilla-router';
 
 import {
   assertRouterInvariant,

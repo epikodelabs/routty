@@ -1,20 +1,21 @@
 # Routty
 
-Routty is a typed, standalone-first Angular router built around flat runtime routes, explicit layout composition, and function-based lifecycle.
+Routty is a typed Angular router built around **one eager route model for both server and client navigation**.
 
-Define routes once, then use those same definitions for matching, rendering, guards, data preparation, typed params and query values, `RouterLink`, and typed `navigateTo` / `hrefTo` helpers.
+Routes are authored once and reused for URL matching, SSR, hydrated browser navigation, lifecycle, typed params and query values, layouts, named outlets, `RouterLink`, and typed `navigateTo` / `hrefTo` helpers.
 
-Routty is for teams that want Angular routing to stay readable. You author layouts naturally, but the runtime stays flat. That keeps the mental model smaller without giving up typed navigation, lazy views, lifecycle hooks, or coordinated outlets.
+Routty deliberately does not have a lazy route model. Components are part of the application build, while route preparation and lifecycle may still be asynchronous.
 
 ## Why Routty
 
 Routty is a strong fit when you want:
 
-- **One route definition, used everywhere.** Keep the path, route identity, params/query schemas, lifecycle, and rendering behavior together instead of splitting them across several files.
-- **Flat runtime navigation state.** Layouts are UI composition, not nested route state that every feature has to understand.
-- **Typed params, query values, and named navigation.** Declare schemas once and get real TypeScript types when you read route state or generate links.
-- **Function-based lifecycle beside the view.** `beforeEnter`, `beforeLeave`, `prepare`, and `afterEnter` stay close to the component they affect.
-- **Standalone Angular integration.** Use a router that fits modern Angular applications without a compatibility layer for older router patterns.
+- **One route catalog for server and browser.** The same route definitions drive Angular SSR and client-side navigation after hydration.
+- **Flat runtime navigation state.** Layouts compose UI; they do not create recursive route state.
+- **Eager, predictable route code.** There is no route loader, preload strategy, or separate lazy-route API.
+- **Typed params, query values, and named navigation.** Declare schemas once and reuse their types for state and links.
+- **Function-based lifecycle beside the destination.** `beforeEnter`, `beforeLeave`, `prepare`, and `afterEnter` live directly on `route()` or `layout()`.
+- **Coordinated named outlets.** Companion views belong to the primary destination and commit together.
 
 ## Installation
 
@@ -22,51 +23,50 @@ Routty is a strong fit when you want:
 npm install @epikodelabs/routty
 ```
 
-Routty is built on standalone Angular APIs and is intended to work across recent Angular versions.
-
 ## Quick start
 
 ```ts
 import { inject } from '@angular/core';
 import {
-  frame,
   layout,
   provideRouter,
+  redirect,
   route,
   s,
   type NavigationTree,
 } from '@epikodelabs/routty';
 
-const projectRoute = route(
-  '/projects/:projectId',
-  frame(ProjectPage, {
-    beforeEnter: [
-      () =>
+export const routes = [
+  redirect('/', '/app/projects/1'),
+
+  layout('/app', AppShellComponent, [
+    route('/projects/:projectId', ProjectPage, {
+      name: 'project',
+
+      params: {
+        projectId: s.number({ min: 1 }),
+      },
+
+      query: {
+        tab: s.string('overview'),
+      },
+
+      outlets: {
+        sidebar: ProjectSidebarComponent,
+      },
+
+      beforeEnter: () =>
         inject(SessionService).authenticated()
           ? true
           : { redirectTo: '/auth/login', replace: true },
-    ],
-    prepare: [
-      context => ({
+
+      prepare: context => ({
         project: inject(ProjectStore).load(
           Number(context.params['projectId'] ?? 0),
         ),
       }),
-    ],
-  }),
-  {
-    name: 'project',
-    paramsSchema: {
-      projectId: s.number({ min: 1 }),
-    },
-    querySchema: {
-      tab: s.string('overview'),
-    },
-  },
-);
-
-export const routes = [
-  layout('/app', AppShellComponent, [projectRoute]),
+    }),
+  ]),
 ] as const satisfies NavigationTree;
 
 export const appConfig = {
@@ -74,37 +74,53 @@ export const appConfig = {
 };
 ```
 
-That single route definition now drives:
+The same `routes` value is used when Angular renders the application on the server and when the hydrated browser handles later navigation.
 
-- URL matching
-- typed params and query parsing
-- auth and lifecycle behavior
-- data preparation
-- link generation
-- programmatic navigation by route name
+## Public route language
 
-In templates and standalone components, use `RouterLink` and `RouterOutlet` from Routty.
+Routty intentionally keeps route construction small:
 
-## Core ideas
+- `route(path, component, options)` — define an eager destination.
+- `layout(path, component, entries, options)` — compose eager UI around destinations.
+- `redirect(path, target, options)` — redirect one URL to another.
 
-- **`path`** is the URL contract for matching and link generation.
-- **`name`** is the symbolic identity of a primary route for typed navigation.
-- **`frame`** wraps a component with `beforeEnter`, `beforeLeave`, `prepare`, and `afterEnter`.
-- **`layout`** composes a shell around a set of routes without turning the runtime into a nested route tree.
+There is no `lazyRoute`, `lazyLayout`, `lazyFrame`, route loader, or preloading strategy.
 
-Named outlets are supported, but they stay attached to a primary route and share the same path:
+## Route options
+
+A route may define:
+
+- `name`
+- `params`
+- `query`
+- `outlets`
+- `data`
+- `providers`
+- `beforeEnter`
+- `beforeLeave`
+- `prepare`
+- `afterEnter`
+- `viewTransition`
+
+Lifecycle handlers accept either one function or an array. Routty normalizes them internally.
+
+### Named outlets
+
+Named outlets are authored on their primary destination:
 
 ```ts
-route('/projects/:projectId', ProjectSidebarComponent, {
-  outlet: 'sidebar',
-})
+route('/projects/:projectId', ProjectPage, {
+  outlets: {
+    sidebar: ProjectSidebarComponent,
+  },
+});
 ```
 
-That keeps outlets as coordinated companions to one destination, not independent pages with separate navigation state.
+They share the primary route's path, params, query, layouts, and navigation transaction.
 
 ### Typed params and queries with `s`
 
-The `s` helper builds small route schemas:
+The `s` helper builds route schemas:
 
 - `s.string(default)`
 - `s.number({ min, max, default })`
@@ -113,40 +129,36 @@ The `s` helper builds small route schemas:
 - `s.date(default)`
 - `s.optional(schema)`
 
-Attach schemas to `paramsSchema` or `querySchema`, and Routty handles parsing, defaulting, serialization, and matching TypeScript inference.
+Attach schemas through `params` and `query`. Routty handles parsing, defaults, serialization, and TypeScript inference.
 
-## Included helpers
+## Server and client routing
 
-Routty also exports:
+Routty does not maintain separate server and browser route APIs.
 
-- `lazyRoute(...)`
-- `redirectRoute(...)`
-- `lazyLayout(...)`
-- `lazyFrame(...)`
-- `RouterLink`
-- `RouterOutlet`
-- typed `navigateTo` and `hrefTo` helpers on the router instance
+On the server, Angular SSR boots the application, Routty matches the request URL, parses params/query, runs applicable lifecycle and preparation, and renders the matched route tree.
 
-## Current scope
+After hydration, the same route catalog handles `RouterLink`, history, redirects, revalidation, scrolling, view transitions, and outlet commits in the browser.
 
-Routty is intentionally focused rather than feature-complete. Today it is best suited to standalone Angular apps that want a typed, explicit routing layer without adopting Angular Router's recursive route-state model.
+Routty does **not** implement server-authorized route artifact delivery. Applications that need the server to decide which route code the browser may receive should use Waypoint instead.
 
-Current boundaries to keep in mind:
+## Current boundaries
 
-- no `RouterModule.forRoot()` or `RouterModule.forChild()` integration
-- no `loadChildren` or lazy `NgModule` boundaries
+- eager route components only
+- no `loadChildren`
+- no lazy `NgModule` boundaries
 - no Angular `Route` compatibility layer
-- named outlets are subordinate to a primary route and cannot behave like independent pages
-
-Those constraints are part of the product shape, not temporary omissions. Routty is optimized for applications that want a compact router with explicit composition and a flat runtime model.
+- named outlets are subordinate to one primary destination
+- one complete route catalog is available to both server and client
 
 ## Demo
 
-See `projects/apps/app1/src/app/app.routes.ts` for a working reference with typed params, redirects, lazy routes, lifecycle hooks, layouts, and a coordinated `sidebar` outlet.
+`projects/apps/app1` demonstrates client navigation. `projects/apps/app2` demonstrates the same eager route model under Angular SSR and hydration.
 
 ## Development
 
 ```bash
 npm run build
 npm test
+npm run build:app2
+npm run serve:ssr:app2
 ```

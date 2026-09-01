@@ -1,4 +1,4 @@
-import { createRouter, type Route, type VanillaRouter, type VanillaRouterConfig } from '@epikodelabs/routty';
+import { createRouter, type Route, type Router as VanillaRouter, type RouterConfig as VanillaRouterConfig } from '../lib/vanilla-router';
 import { idescribe } from './env.spec';
 
 function unwrapTestComponent<T>(value: T | { default: T }): T {
@@ -1302,38 +1302,6 @@ idescribe('Router', () => {
                 transitionDocument.startViewTransition = original;
             }
         });
-        it('should preload flat lazy routes eagerly when configured', async () => {
-            const aboutLoader = jasmine.createSpy('aboutLoader')
-                .and.returnValue(Promise.resolve(createComponent('About')));
-            const settingsLoader = jasmine.createSpy('settingsLoader')
-                .and.returnValue(Promise.resolve(createComponent('Settings')));
-
-            router = createRouter({
-                routes: [
-                    {
-                        path: 'about',
-                        load: async () => ({
-                            component: unwrapTestComponent(await aboutLoader())
-                        })
-                    },
-                    {
-                        path: 'settings',
-                        load: async () => ({
-                            component: unwrapTestComponent(await settingsLoader())
-                        })
-                    },
-                ], render: (name, node) => {
-                    outlet.replaceChildren(node);
-                },
-                preloading: 'eager'
-            });
-
-            router.start();
-            await delay(50);
-
-            expect(aboutLoader).toHaveBeenCalledTimes(1);
-            expect(settingsLoader).toHaveBeenCalledTimes(1);
-        });
         it('should clear stale error state on blocked navigation', async () => {
             const config: VanillaRouterConfig = {
                 routes: [
@@ -2267,31 +2235,6 @@ idescribe('Router', () => {
                 .toContain('cannot define parseParams or parseQuery');
         });
 
-        it('should preload every member of an enabled route group', async () => {
-            const primaryLoad = jasmine.createSpy('primaryLoad').and.resolveTo({
-                component: createComponent('Primary')
-            });
-            const sidebarLoad = jasmine.createSpy('sidebarLoad').and.resolveTo({
-                component: createComponent('Sidebar')
-            });
-
-            router = createRouter({
-                routes: [{
-                    path: 'project',
-                    load: primaryLoad,
-                    outlets: [{
-                        path: 'project',
-                        outlet: 'sidebar',
-                        load: sidebarLoad
-                    }]
-                }]
-            });
-
-            await router.preload();
-            expect(primaryLoad).toHaveBeenCalledTimes(1);
-            expect(sidebarLoad).toHaveBeenCalledTimes(1);
-        });
-
         it('should preserve the active route when a later group fails to prepare', async () => {
             const primary = document.createElement('div');
             router = createRouter({
@@ -2444,5 +2387,3 @@ idescribe('Router', () => {
         });
     });
 });
-
-

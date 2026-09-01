@@ -1,7 +1,7 @@
 import type {
   Route,
-  VanillaRouter,
-} from '@epikodelabs/routty';
+  Router as VanillaRouter,
+} from '../lib/vanilla-router';
 
 export interface RouterInvariantOptions {
   /**

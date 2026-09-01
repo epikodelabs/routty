@@ -11,7 +11,6 @@ import type {
 } from './vanilla-router';
 
 export type MaybePromise<T> = T | PromiseLike<T>;
-export type Lazy<T> = () => MaybePromise<T | { readonly default: T }>;
 
 export type NavigationProvider = Provider | EnvironmentProviders;
 export type NavigationProviders = readonly NavigationProvider[];
@@ -21,13 +20,14 @@ export type RouteRedirect = {
   readonly replace?: boolean;
 };
 
-export type FramePrepareResult = void | RouteData;
+export type EmptyRouteData = Readonly<Record<string, never>>;
+export type PrepareResult = void | RouteData;
 
-export type FramePrepareFn<
-  TResult extends FramePrepareResult = FramePrepareResult,
-> = (
-  context: NavigationContext,
-) => MaybePromise<TResult>;
+export type PrepareFn<
+  TResult extends PrepareResult = PrepareResult,
+> = (context: NavigationContext) => MaybePromise<TResult>;
+
+export type HookList<T> = T | readonly T[];
 
 type AwaitedPrepareResult<TPrepare> =
   TPrepare extends (...args: never[]) => infer TResult
@@ -36,94 +36,75 @@ type AwaitedPrepareResult<TPrepare> =
 
 type UnionToIntersection<T> =
   (T extends unknown ? (value: T) => void : never) extends
-    (value: infer TIntersection) => void
-      ? TIntersection
-      : never;
+    (value: infer TIntersection) => void ? TIntersection : never;
 
-type Simplify<T> = {
-  readonly [TKey in keyof T]: T[TKey];
-};
+type Simplify<T> = { readonly [TKey in keyof T]: T[TKey] };
 
-/**
- * Merges the object results of all prepare handlers in a frame.
- * A handler returning void contributes no keys.
- */
 export type InferPreparedData<
-  TPrepare extends readonly FramePrepareFn[] | undefined,
-> = [TPrepare] extends [readonly FramePrepareFn[]]
-  ? [AwaitedPrepareResult<TPrepare[number]>] extends [never]
-    ? Readonly<Record<string, never>>
-    : Simplify<UnionToIntersection<AwaitedPrepareResult<TPrepare[number]>>>
-  : Readonly<Record<string, never>>;
+  TPrepare extends HookList<PrepareFn> | undefined,
+> = [TPrepare] extends [HookList<PrepareFn>]
+  ? [AwaitedPrepareResult<
+      TPrepare extends readonly PrepareFn[] ? TPrepare[number] : TPrepare
+    >] extends [never]
+    ? EmptyRouteData
+    : Simplify<UnionToIntersection<AwaitedPrepareResult<
+        TPrepare extends readonly PrepareFn[] ? TPrepare[number] : TPrepare
+      >>>
+  : EmptyRouteData;
 
-export type FrameAfterEnterFn<
+export type AfterEnterFn<TData extends RouteData = RouteData> =
+  (route: ActivatedRoute<TData>) => MaybePromise<void>;
+
+export type BeforeLeaveFn<TData extends RouteData = RouteData> =
+  (route: DeactivationContext<TData>) => MaybePromise<GuardResult>;
+
+export interface NavigationHooks<
+  TPrepare extends HookList<PrepareFn> | undefined =
+    HookList<PrepareFn> | undefined,
+> {
+  readonly beforeEnter?: HookList<RouterCanActivateFn>;
+  readonly beforeLeave?: HookList<BeforeLeaveFn<InferPreparedData<TPrepare>>>;
+  readonly prepare?: TPrepare;
+  readonly afterEnter?: HookList<AfterEnterFn<InferPreparedData<TPrepare>>>;
+}
+
+export interface NormalizedNavigationHooks<
   TData extends RouteData = RouteData,
-> = (
-  route: ActivatedRoute<TData>,
-) => MaybePromise<void>;
-
-export type FrameBeforeLeaveFn<
-  TData extends RouteData = RouteData,
-> = (
-  route: DeactivationContext<TData>,
-) => MaybePromise<GuardResult>;
-
-export interface FrameHooks<
-  TPrepare extends readonly FramePrepareFn[] | undefined =
-    readonly FramePrepareFn[] | undefined,
 > {
   readonly beforeEnter?: readonly RouterCanActivateFn[];
-  readonly beforeLeave?: readonly FrameBeforeLeaveFn<InferPreparedData<TPrepare>>[];
-  readonly prepare?: TPrepare;
-  readonly afterEnter?: readonly FrameAfterEnterFn<InferPreparedData<TPrepare>>[];
+  readonly beforeLeave?: readonly BeforeLeaveFn<TData>[];
+  readonly prepare?: readonly PrepareFn[];
+  readonly afterEnter?: readonly AfterEnterFn<TData>[];
 }
-
-export interface EagerViewDefinition {
-  readonly component: Type<unknown>;
-  readonly loadComponent?: never;
-}
-
-export interface LazyViewDefinition {
-  readonly component?: never;
-  readonly loadComponent: Lazy<Type<unknown>>;
-}
-
-export type ViewDefinition = EagerViewDefinition | LazyViewDefinition;
-
-export type FrameView<
-  TData extends RouteData = RouteData,
-> = ViewDefinition & {
-  readonly kind: 'frame';
-  readonly beforeEnter?: readonly RouterCanActivateFn[];
-  readonly beforeLeave?: readonly FrameBeforeLeaveFn<TData>[];
-  readonly prepare?: readonly FramePrepareFn[];
-  readonly afterEnter?: readonly FrameAfterEnterFn<TData>[];
-};
-
-export type InferFrameData<TFrame> =
-  TFrame extends FrameView<infer TData>
-    ? TData
-    : Readonly<Record<string, never>>;
 
 export interface RouteDefinitionBase<
   TPath extends string = string,
   TName extends string | undefined = string | undefined,
-  TParamsSchema extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
-  TQuerySchema extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
 > {
-  readonly kind: 'route';
   readonly path: TPath;
   readonly name?: TName;
-  readonly outlet?: string;
-  readonly preload?: boolean;
-  readonly viewTransition?: boolean;
-  readonly paramsSchema?: TParamsSchema;
-  readonly querySchema?: TQuerySchema;
   readonly data?: Readonly<Record<string, unknown>>;
   readonly providers?: NavigationProviders;
 }
 
-export type ParamsSchemaForPath<TPath extends string> =
+export type RouteOutlets = Readonly<Record<string, Type<unknown>>>;
+
+export interface RenderableRouteDefinitionBase<
+  TPath extends string = string,
+  TName extends string | undefined = string | undefined,
+  TParams extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
+  TQuery extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
+> extends RouteDefinitionBase<TPath, TName> {
+  readonly kind: 'route';
+  /** Internal compiled outlet identity. Author named outlets through `outlets`. */
+  readonly outlet?: string;
+  readonly viewTransition?: boolean;
+  readonly params?: TParams;
+  readonly query?: TQuery;
+  readonly outlets?: RouteOutlets;
+}
+
+export type ParamsForPath<TPath extends string> =
   [ExtractPathParams<TPath>] extends [never]
     ? never
     : Readonly<{
@@ -131,58 +112,52 @@ export type ParamsSchemaForPath<TPath extends string> =
       }>;
 
 export type RouteOptions<
-  TPath extends string = string,
   TName extends string | undefined = string | undefined,
-  TParamsSchema extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
-  TQuerySchema extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
+  TParams extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
+  TQuery extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
+  TPrepare extends HookList<PrepareFn> | undefined =
+    HookList<PrepareFn> | undefined,
 > = Omit<
-  RouteDefinitionBase<TPath, TName, TParamsSchema, TQuerySchema>,
-  'kind' | 'path'
->;
+  RenderableRouteDefinitionBase<string, TName, TParams, TQuery>,
+  'kind' | 'path' | 'outlet'
+> & NavigationHooks<TPrepare>;
 
 export interface RedirectRouteDefinition<
   TPath extends string = string,
   TName extends string | undefined = string | undefined,
-> {
+> extends RouteDefinitionBase<TPath, TName> {
   readonly kind: 'redirect';
-  readonly path: TPath;
-  readonly name?: TName;
   readonly redirectTo: string;
-  readonly data?: Readonly<Record<string, unknown>>;
-  readonly providers?: NavigationProviders;
 }
 
 export type RenderableRoute<
   TPath extends string = string,
   TName extends string | undefined = string | undefined,
-  TParamsSchema extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
-  TQuerySchema extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
-  TFrame extends FrameView<any> | undefined = FrameView<any> | undefined,
-> = RouteDefinitionBase<TPath, TName, TParamsSchema, TQuerySchema> &
-  ViewDefinition & {
-    readonly frame?: TFrame;
+  TParams extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
+  TQuery extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
+  TPrepare extends HookList<PrepareFn> | undefined = HookList<PrepareFn> | undefined,
+> = RenderableRouteDefinitionBase<TPath, TName, TParams, TQuery> &
+  NormalizedNavigationHooks<InferPreparedData<TPrepare>> & {
+    /** @internal Type-only carrier for prepared-data inference. */
+    readonly __preparedData?: InferPreparedData<TPrepare>;
+    readonly component: Type<unknown>;
+    readonly redirectTo?: never;
   };
 
 export type RouteDefinition<
   TPath extends string = string,
   TName extends string | undefined = string | undefined,
-  TParamsSchema extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
-  TQuerySchema extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
-  TFrame extends FrameView<any> | undefined = FrameView<any> | undefined,
+  TParams extends ParamSchemaRecord | undefined = ParamSchemaRecord | undefined,
+  TQuery extends QuerySchemaRecord | undefined = QuerySchemaRecord | undefined,
+  TPrepare extends HookList<PrepareFn> | undefined = HookList<PrepareFn> | undefined,
 > =
   | RedirectRouteDefinition<TPath, TName>
-  | RenderableRoute<TPath, TName, TParamsSchema, TQuerySchema, TFrame>;
+  | RenderableRoute<TPath, TName, TParams, TQuery, TPrepare>;
 
 export type InferRoutePreparedData<TRoute> =
-  TRoute extends RenderableRoute<string, string | undefined, any, any, infer TFrame>
-    ? TFrame extends FrameView<any>
-      ? InferFrameData<TFrame>
-      : Readonly<Record<string, never>>
-    : Readonly<Record<string, never>>;
-
-
-
-type EmptyRouteData = Readonly<Record<string, never>>;
+  TRoute extends { readonly __preparedData?: infer TData }
+    ? NonNullable<TData>
+    : EmptyRouteData;
 
 type NormalizePreparedData<TData> =
   string extends keyof TData ? Readonly<{}> : TData;
@@ -190,55 +165,6 @@ type NormalizePreparedData<TData> =
 type MergePreparedData<TLeft, TRight> = Simplify<
   NormalizePreparedData<TLeft> & NormalizePreparedData<TRight>
 >;
-
-type InferLayoutPreparedData<TLayout> =
-  TLayout extends LayoutDefinition<any, any, infer TFrame>
-    ? TFrame extends FrameView<any>
-      ? InferFrameData<TFrame>
-      : EmptyRouteData
-    : EmptyRouteData;
-
-type RouteNameMatches<TRoute, TName extends string> =
-  TRoute extends { readonly name?: infer TRouteName }
-    ? TRouteName extends TName
-      ? true
-      : false
-    : false;
-
-type InferNavigationPreparedDataFromEntry<
-  TEntry,
-  TName extends string,
-  TInherited extends RouteData,
-> = TEntry extends LayoutDefinition<any, infer TEntries, any>
-  ? InferNavigationPreparedDataFromTree<
-      TEntries,
-      TName,
-      MergePreparedData<TInherited, InferLayoutPreparedData<TEntry>>
-    >
-  : TEntry extends RouteDefinition
-    ? RouteNameMatches<TEntry, TName> extends true
-      ? MergePreparedData<TInherited, InferRoutePreparedData<TEntry>>
-      : never
-    : never;
-
-type InferNavigationPreparedDataFromTree<
-  TTree,
-  TName extends string,
-  TInherited extends RouteData,
-> = TTree extends readonly unknown[]
-  ? InferNavigationPreparedDataFromEntry<TTree[number], TName, TInherited>
-  : never;
-
-/**
- * Infers all data returned by prepare handlers for a named route, including
- * every parent layout frame and the route frame itself.
- */
-export type InferNavigationPreparedData<
-  TTree extends NavigationTree,
-  TName extends string,
-> = [InferNavigationPreparedDataFromTree<TTree, TName, EmptyRouteData>] extends [never]
-  ? never
-  : InferNavigationPreparedDataFromTree<TTree, TName, EmptyRouteData>;
 
 export interface LayoutDefinitionBase<
   TPath extends string = string,
@@ -250,22 +176,83 @@ export interface LayoutDefinitionBase<
   readonly providers?: NavigationProviders;
 }
 
-export type LayoutOptions = Omit<
-  LayoutDefinitionBase,
-  'kind' | 'path' | 'entries'
->;
+export type LayoutOptions<
+  TPrepare extends HookList<PrepareFn> | undefined =
+    HookList<PrepareFn> | undefined,
+> = Omit<LayoutDefinitionBase, 'kind' | 'path' | 'entries'> & NavigationHooks<TPrepare>;
 
 export type LayoutDefinition<
   TPath extends string = string,
   TEntries extends NavigationTree = NavigationTree,
-  TFrame extends FrameView<any> | undefined = FrameView<any> | undefined,
+  TPrepare extends HookList<PrepareFn> | undefined = HookList<PrepareFn> | undefined,
 > = LayoutDefinitionBase<TPath, TEntries> &
-  ViewDefinition & {
-    readonly frame?: TFrame;
+  NormalizedNavigationHooks<InferPreparedData<TPrepare>> & {
+    /** @internal Type-only carrier for prepared-data inference. */
+    readonly __preparedData?: InferPreparedData<TPrepare>;
+    readonly component: Type<unknown>;
   };
 
-export type AnyRouteDefinition = RouteDefinition<any, any, any, any, any>;
-export type AnyLayoutDefinition = LayoutDefinition<any, any, any>;
+type InferLayoutPreparedData<TLayout> =
+  TLayout extends { readonly __preparedData?: infer TData }
+    ? NonNullable<TData>
+    : EmptyRouteData;
+
+type EntryPreparedData<TEntry> =
+  TEntry extends { readonly __preparedData?: infer TData }
+    ? NonNullable<TData>
+    : EmptyRouteData;
+
+type InferNavigationPreparedDataFromEntry<
+  TEntry,
+  TName extends string,
+  TInherited,
+> = TEntry extends {
+  readonly kind: 'layout';
+  readonly entries: infer TEntries;
+}
+  ? InferNavigationPreparedDataFromTree<
+      TEntries,
+      TName,
+      MergePreparedData<TInherited, EntryPreparedData<TEntry>>
+    >
+  : TEntry extends { readonly kind: 'route'; readonly name?: infer TRouteName }
+    ? TRouteName extends TName
+      ? MergePreparedData<TInherited, EntryPreparedData<TEntry>>
+      : never
+    : never;
+
+type InferNavigationPreparedDataFromTree<
+  TTree,
+  TName extends string,
+  TInherited,
+> = TTree extends readonly unknown[]
+  ? InferNavigationPreparedDataFromEntry<TTree[number], TName, TInherited>
+  : never;
+
+export type InferNavigationPreparedData<
+  TTree extends NavigationTree,
+  TName extends string,
+> = [InferNavigationPreparedDataFromTree<TTree, TName, EmptyRouteData>] extends [never]
+  ? never
+  : InferNavigationPreparedDataFromTree<TTree, TName, EmptyRouteData>;
+
+export type AnyRouteDefinition =
+  | RedirectRouteDefinition<any, any>
+  | (RenderableRouteDefinitionBase<any, any, any, any> & {
+      readonly component: Type<unknown>;
+      readonly beforeEnter?: readonly ((context: any) => MaybePromise<any>)[];
+      readonly beforeLeave?: readonly ((context: any) => MaybePromise<any>)[];
+      readonly prepare?: readonly ((context: any) => MaybePromise<any>)[];
+      readonly afterEnter?: readonly ((context: any) => MaybePromise<any>)[];
+    });
+
+export type AnyLayoutDefinition = LayoutDefinitionBase<any, any> & {
+  readonly component: Type<unknown>;
+  readonly beforeEnter?: readonly ((context: any) => MaybePromise<any>)[];
+  readonly beforeLeave?: readonly ((context: any) => MaybePromise<any>)[];
+  readonly prepare?: readonly ((context: any) => MaybePromise<any>)[];
+  readonly afterEnter?: readonly ((context: any) => MaybePromise<any>)[];
+};
 
 export type NavigationEntry = AnyRouteDefinition | AnyLayoutDefinition;
 export type NavigationTree = readonly NavigationEntry[];

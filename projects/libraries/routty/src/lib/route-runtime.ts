@@ -4,12 +4,15 @@ import type {
   ParseRouteParams,
   ParseRouteQuery,
   PrepareRouteDataFn,
-  RedirectRoute,
   RenderableRoute,
   Route,
 } from './vanilla-router';
 
-/** Runtime capabilities resolved from a renderable route definition. */
+/**
+ * Compatibility shape for code that used Routty's former lazy route runtime.
+ * Routty routes are eager now, so these capabilities are read directly from
+ * the route definition and no loader/cache exists.
+ */
 export interface RouteRuntime {
   readonly component?: import('./vanilla-router').RouteComponent;
   readonly canActivate?: readonly CanActivateFn[];
@@ -19,80 +22,25 @@ export interface RouteRuntime {
   readonly parseQuery?: ParseRouteQuery;
 }
 
-const routeRuntimeCache = new WeakMap<RenderableRoute, Promise<RouteRuntime>>();
-
 export function prepareRouteRuntime(
   route: RenderableRoute,
 ): Promise<RouteRuntime> {
-  let pending = routeRuntimeCache.get(route);
-
-  if (!pending) {
-    pending = Promise
-      .resolve(
-        route.load?.() ?? {},
-      )
-      .then(runtime => Object.freeze({
-        component: runtime.component,
-        canActivate: runtime.canActivate,
-        canDeactivate: runtime.canDeactivate,
-        prepare: runtime.prepare ?? route.prepare,
-        parseParams: runtime.parseParams,
-        parseQuery: runtime.parseQuery,
-      }))
-      .catch(error => {
-        routeRuntimeCache.delete(route);
-        throw error;
-      });
-
-    routeRuntimeCache.set(route, pending);
-  }
-
-  return pending;
+  return Promise.resolve(route);
 }
 
 export async function preloadRouteCatalog(
   routes: readonly Route[],
-  trace: (message: string, ...values: unknown[]) => void,
+  _trace: (message: string, ...values: unknown[]) => void,
 ): Promise<void> {
   for (const route of routes) {
-    if (isRedirectRoute(route) || route.preload === false) {
-      continue;
-    }
+    if (route.kind === 'redirect' || typeof route.redirectTo === 'string') continue;
 
-    const group: readonly RenderableRoute[] = [
-      route,
-      ...(route.outlets ?? []),
-    ];
-
-    for (const member of group) {
-      try {
-        const runtime = await prepareRouteRuntime(member);
-
-        if (
-          member !== route
-          && (runtime.parseParams || runtime.parseQuery)
-        ) {
-          throw new Error(
-            `Outlet "${member.outlet}" cannot define parseParams or parseQuery`,
-          );
-        }
-      } catch (error) {
-        trace(
-          'Route preload failed',
-          member.path,
-          member.outlet ?? '',
-          error,
+    for (const member of route.outlets ?? []) {
+      if (member.parseParams || member.parseQuery) {
+        throw new Error(
+          `Outlet "${member.outlet}" cannot define parseParams or parseQuery`,
         );
       }
     }
   }
-}
-
-function isRedirectRoute(
-  route: Route,
-): route is RedirectRoute {
-  return (
-    route.kind === 'redirect'
-    || typeof route.redirectTo === 'string'
-  );
 }

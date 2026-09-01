@@ -8,8 +8,9 @@ import { createRouteRegistry } from '../lib/route-compiler';
 
 class TestPage {}
 class TestLayout {}
+class TestSidebar {}
 
-describe('route compiler parameter validation', () => {
+describe('route compiler', () => {
   it('rejects duplicate parameter names across layouts and leaf routes', () => {
     const routes = [
       layout('/teams/:id', TestLayout, [
@@ -22,39 +23,39 @@ describe('route compiler parameter validation', () => {
     );
   });
 
-  it('rejects paramsSchema keys that are absent from the compiled path', () => {
+  it('rejects params keys that are absent from the compiled path', () => {
     const routes = [
       route('/users/:userId', TestPage, {
-        paramsSchema: {
+        params: {
           id: s.number(),
-        },
+        } as any,
       }),
     ] as const;
 
     expect(() => createRouteRegistry(routes)).toThrowError(
-      /paramsSchema declares "id".*does not contain ":id"/,
+      /params declares "id".*does not contain ":id"/,
     );
   });
 
-  it('requires every path parameter to be declared when paramsSchema is present', () => {
+  it('requires every path parameter when params is present', () => {
     const routes = [
       route('/teams/:teamId/users/:userId', TestPage, {
-        paramsSchema: {
+        params: {
           teamId: s.number(),
-        },
+        } as any,
       }),
     ] as const;
 
     expect(() => createRouteRegistry(routes)).toThrowError(
-      /contains ":userId", but paramsSchema does not declare it/,
+      /contains ":userId", but params does not declare it/,
     );
   });
 
-  it('accepts an exact paramsSchema for the compiled path', () => {
+  it('accepts exact params for the compiled path', () => {
     const routes = [
       layout('/teams/:teamId', TestLayout, [
         route('/users/:userId', TestPage, {
-          paramsSchema: {
+          params: {
             teamId: s.number(),
             userId: s.number(),
           },
@@ -63,5 +64,21 @@ describe('route compiler parameter validation', () => {
     ] as const;
 
     expect(() => createRouteRegistry(routes)).not.toThrow();
+  });
+
+  it('expands authored named outlets into one compiled route group', () => {
+    const registry = createRouteRegistry([
+      route('/projects/:projectId', TestPage, {
+        outlets: {
+          sidebar: TestSidebar,
+        },
+      }),
+    ] as const);
+
+    expect(registry.groups.length).toBe(1);
+    expect(registry.groups[0]?.outlets.length).toBe(1);
+    const outlet = registry.groups[0]?.outlets[0]?.route;
+    expect(outlet?.kind).toBe('route');
+    expect(outlet?.kind === 'route' ? outlet.outlet : undefined).toBe('sidebar');
   });
 });

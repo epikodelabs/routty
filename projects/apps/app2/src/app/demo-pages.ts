@@ -546,7 +546,7 @@ const sidebarStyles = `
         >
           Project 202
         </a>
-        <a [routerLink]="{ name: 'reports' }">Lazy reports</a>
+        <a [routerLink]="{ name: 'reports' }">Reports</a>
         <a [routerLink]="{ name: 'about' }">About</a>
         <a [routerLink]="'/legacy'">Redirect</a>
       </nav>
@@ -653,7 +653,7 @@ export class AppShellComponent {
               </article>
               <article class="signal-metric">
                 <strong>1</strong>
-                <span>lazy primary route</span>
+                <span>eager primary route</span>
               </article>
               <article class="signal-metric">
                 <strong>1</strong>
@@ -688,10 +688,10 @@ export class AppShellComponent {
 
           <article class="scenario-card">
             <p class="eyebrow">Flow coverage</p>
-            <h3>Redirects and lazy loading</h3>
+            <h3>Redirects and hydration</h3>
             <p>
               Visit <code>/legacy</code> to confirm redirect behavior, then move
-              to the lazy reports page and back to verify grouped outlet swaps.
+              to the reports page and back to verify grouped outlet swaps after hydration.
             </p>
           </article>
         </div>
@@ -704,7 +704,7 @@ export class AppShellComponent {
               <li>typed params and query parsing</li>
               <li>prepare hooks feeding route data</li>
               <li>layout composition with a named sidebar outlet</li>
-              <li>lazy primary routes under SSR</li>
+              <li>eager primary routes under SSR</li>
             </ul>
           </article>
 
@@ -809,7 +809,7 @@ export class IntroPage {
           Activity
         </a>
         <button type="button" class="action-button" (click)="openReports()">
-          Go to lazy reports
+          Go to reports
         </button>
       </div>
     </section>
@@ -934,7 +934,7 @@ export class ProjectSidebarComponent {
           <ul>
             <li>route catalog</li>
             <li>layout shell</li>
-            <li>lazy reports route</li>
+            <li>eager reports route</li>
             <li>project prepare hook</li>
           </ul>
         </article>
@@ -960,7 +960,7 @@ export class AboutPage {}
     <section class="sidebar-card">
       <h3>Reports sidebar</h3>
       <p>
-        The sidebar is eager even though the primary reports page is lazy.
+        The sidebar and primary reports page are both eager and commit together.
       </p>
       <ul>
         <li>Try a hard refresh on <code>/app/reports</code>.</li>

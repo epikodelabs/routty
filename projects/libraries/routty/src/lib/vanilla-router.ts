@@ -125,8 +125,6 @@ export interface RedirectRoute extends RouteBase {
   readonly redirectTo: string;
   readonly outlet?: never;
   readonly outlets?: never;
-  readonly load?: never;
-  readonly preload?: never;
   readonly viewTransition?: never;
   readonly canActivate?: never;
   readonly canDeactivate?: never;
@@ -137,13 +135,16 @@ export interface RenderableRoute extends RouteBase {
   readonly kind?: 'route';
   readonly outlet?: string;
   readonly outlets?: readonly RenderableRoute[];
+  readonly component?: RouteComponent;
+  /** @internal Legacy runtime loader; public Routty authoring is eager-only. */
   readonly load?: () => MaybePromise<LoadedRoute>;
   readonly redirectTo?: never;
-  readonly preload?: boolean;
   readonly viewTransition?: boolean;
   readonly canActivate?: CanActivateFn[];
   readonly canDeactivate?: CanDeactivateFn[];
   readonly prepare?: readonly PrepareRouteDataFn[];
+  readonly parseParams?: ParseRouteParams;
+  readonly parseQuery?: ParseRouteQuery;
 }
 
 export type Route = RedirectRoute | RenderableRoute;
@@ -185,7 +186,6 @@ export interface NavigationOptions {
 }
 
 export type ScrollRestorationMode = 'restore' | 'top' | 'preserve';
-export type PreloadingStrategy = 'none' | 'eager' | 'idle';
 export type ViewTransitionPhase = 'success' | 'not-found' | 'error';
 
 export interface ViewTransitionContext {
@@ -240,7 +240,6 @@ export interface Router {
   replace(target: string | URL, state?: unknown): Promise<boolean>;
   revalidate(): Promise<boolean>;
   updateHistoryState(state: unknown): void;
-  preload(): Promise<void>;
   back(): void;
   forward(): void;
   href(target: string): string;
@@ -259,7 +258,6 @@ export interface RouterConfig {
   maxRedirects?: number;
   onSameUrlNavigation?: 'ignore';
   scrollRestoration?: ScrollRestorationMode;
-  preloading?: PreloadingStrategy;
   viewTransitions?: ViewTransitionsOption;
   navigateExternal?: (url: URL) => void;
   onOutletActivate?: (outlet: HTMLElement, component: unknown) => void;
@@ -630,11 +628,6 @@ function validateRouteGroups(routes: readonly Route[]): void {
       if (outlet.name) {
         throw new Error(`Outlet "${name}" cannot define a route name`);
       }
-      if (outlet.preload !== undefined) {
-        throw new Error(
-          `Outlet "${name}" cannot define preload; the primary route owns group preloading`,
-        );
-      }
       if (outlet.viewTransition !== undefined) {
         throw new Error(
           `Outlet "${name}" cannot define viewTransition; the primary route owns the transition`,
@@ -652,23 +645,18 @@ function validateRouteGroups(routes: readonly Route[]): void {
 
 const routeLoads = new WeakMap<Route, Promise<LoadedRoute>>();
 
-function loadRoute(
-  route: Route,
-): Promise<LoadedRoute> {
+function loadRoute(route: RenderableRoute): Promise<LoadedRoute> {
   let pending = routeLoads.get(route);
 
   if (!pending) {
-    pending = Promise
-      .resolve(
-        route.load?.() ?? {},
-      )
+    pending = Promise.resolve(route.load?.() ?? {})
       .then(loaded => ({
-        component: loaded.component,
-        canActivate: loaded.canActivate,
-        canDeactivate: loaded.canDeactivate,
+        component: loaded.component ?? route.component,
+        canActivate: loaded.canActivate ?? route.canActivate,
+        canDeactivate: loaded.canDeactivate ?? route.canDeactivate,
         prepare: loaded.prepare ?? route.prepare,
-        parseParams: loaded.parseParams,
-        parseQuery: loaded.parseQuery,
+        parseParams: loaded.parseParams ?? route.parseParams,
+        parseQuery: loaded.parseQuery ?? route.parseQuery,
       }))
       .catch(error => {
         routeLoads.delete(route);
@@ -702,7 +690,6 @@ export function createRouter(config: RouterConfig): Router {
   const baseHref = normalizeBaseHref(config.baseHref ?? '/');
   const maxRedirects = config.maxRedirects ?? 10;
   const scrollRestoration = config.scrollRestoration ?? 'preserve';
-  const preloading = config.preloading ?? 'none';
   const viewTransitions = config.viewTransitions ?? false;
   const history = new HistoryManager(
     browserWindow,
@@ -729,10 +716,6 @@ export function createRouter(config: RouterConfig): Router {
   const activeRenders = new Map<string, ActiveRender>();
   const activeRouteStates = new Map<string, ActiveRoute>();
   let startRequestQueued = false;
-  let preloadTask: Promise<void> | null = null;
-  let preloadQueued = false;
-  let preloadIdleId: number | null = null;
-  let preloadTimeoutId: number | null = null;
 
   function trace(message: string, ...values: unknown[]): void {
     if (config.enableTracing) console.debug(`[Router] ${message}`, ...values);
@@ -838,7 +821,7 @@ export function createRouter(config: RouterConfig): Router {
       data: EMPTY_DATA,
       historyState:
         readUserHistoryState(),
-      config: routes[0] ?? { kind: 'route', path: '**' },
+      config: routes[0] ?? ({ kind: 'route', path: '**' } as Route),
     };
   }
 
@@ -1261,109 +1244,6 @@ export function createRouter(config: RouterConfig): Router {
       : null;
   }
 
-  async function runPreloading(): Promise<void> {
-    if (disposed) {
-      return;
-    }
-
-    for (const route of routes) {
-      if (route.preload === false) {
-        continue;
-      }
-
-      const group = [route, ...(route.outlets ?? [])];
-      for (const member of group) {
-        try {
-          const loaded = await loadRoute(member);
-          if (member !== route && (loaded.parseParams || loaded.parseQuery)) {
-            throw new Error(
-              `Outlet "${member.outlet}" cannot define parseParams or parseQuery`,
-            );
-          }
-        } catch (error) {
-          trace('Route preload failed', member.path, member.outlet ?? '', error);
-        }
-      }
-    }
-  }
-
-  function preload(): Promise<void> {
-    preloadQueued = false;
-    preloadTask ??= runPreloading().finally(() => {
-      preloadTask = null;
-    });
-    return preloadTask;
-  }
-
-  function cancelScheduledPreloading(): void {
-    if (preloadIdleId !== null) {
-      const cancelIdle = (browserWindow as (Window & {
-        cancelIdleCallback?: (id: number) => void;
-      }) | null)?.cancelIdleCallback;
-
-      cancelIdle?.(preloadIdleId);
-      preloadIdleId = null;
-    }
-
-    if (preloadTimeoutId !== null) {
-      browserWindow?.clearTimeout(preloadTimeoutId);
-      preloadTimeoutId = null;
-    }
-
-    preloadQueued = false;
-  }
-
-  function schedulePreloading(): void {
-    if (
-      disposed ||
-      preloading === 'none' ||
-      preloadTask ||
-      preloadQueued
-    ) {
-      return;
-    }
-
-    preloadQueued = true;
-
-    const run = async (): Promise<void> => {
-      preloadIdleId = null;
-      preloadTimeoutId = null;
-
-      if (disposed || !started) {
-        preloadQueued = false;
-        return;
-      }
-
-      try {
-        await preload();
-      } catch (error) {
-        trace('Preloading failed', error);
-      }
-    };
-
-    if (preloading === 'eager') {
-      queueMicrotask(async () => {
-        await run();
-      });
-      return;
-    }
-
-    const requestIdle = (browserWindow as (Window & {
-      requestIdleCallback?: (callback: () => void) => number;
-    }) | null)?.requestIdleCallback;
-
-    if (typeof requestIdle === 'function') {
-      preloadIdleId = requestIdle(async () => {
-        await run();
-      });
-      return;
-    }
-
-    preloadTimeoutId = browserWindow?.setTimeout(async () => {
-      await run();
-    }, 0) ?? null;
-  }
-
   async function runCanDeactivateGuards(
     nextUrl: URL,
     signal: AbortSignal,
@@ -1380,6 +1260,7 @@ export function createRouter(config: RouterConfig): Router {
         nextUrl,
         signal,
       };
+      if (isRedirectRoute(activeRoute.config)) continue;
       const loaded = await loadRoute(activeRoute.config);
       throwIfAborted(signal);
 
@@ -2423,7 +2304,6 @@ export function createRouter(config: RouterConfig): Router {
     if (routesChanged) {
       routes = Object.freeze([...nextRoutes]);
       routeVersion++;
-      cancelScheduledPreloading();
     }
 
     if (transitionsChanged) {
@@ -2431,7 +2311,6 @@ export function createRouter(config: RouterConfig): Router {
     }
 
     if (routesChanged) {
-      schedulePreloading();
     }
 
     return true;
@@ -2537,7 +2416,6 @@ export function createRouter(config: RouterConfig): Router {
         'click',
         handleClick,
       );
-    schedulePreloading();
 
     // Starting the router must be synchronous from the caller's point of
     // view. Queue initial URL recognition so `state.pending` remains false
@@ -2578,7 +2456,6 @@ export function createRouter(config: RouterConfig): Router {
   }
 
   function stopRouter(): void {
-    cancelScheduledPreloading();
 
     if (!started) {
       cancelActiveNavigation();
@@ -2690,7 +2567,6 @@ export function createRouter(config: RouterConfig): Router {
     replace: (target, state) => replace(target, state),
     revalidate: () => revalidate(),
     updateHistoryState: (state) => updateHistoryState(state),
-    preload: () => preload(),
     back: () => browserWindow?.history.back(),
     forward: () => browserWindow?.history.forward(),
     href: (target) => href(target),

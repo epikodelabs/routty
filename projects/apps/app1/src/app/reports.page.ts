@@ -1,4 +1,4 @@
-﻿import { Component } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterLink } from '@epikodelabs/routty';
 
 @Component({
@@ -9,18 +9,17 @@ import { RouterLink } from '@epikodelabs/routty';
     <section class="page">
       <header class="page-header">
         <div>
-          <p class="eyebrow">Lazy route</p>
+          <p class="eyebrow">Eager route</p>
           <h1>Reports</h1>
         </div>
-        <span class="status-pill">lazy component</span>
+        <span class="status-pill">eager component</span>
       </header>
 
       <div class="panel-grid">
         <article class="panel">
           <h3>What to verify</h3>
           <p>
-            This page is loaded through <code>lazyRoute()</code> while the
-            paired sidebar route remains eager.
+            This page and its paired sidebar are both part of Routty's eager route catalog.
           </p>
         </article>
         <article class="panel">
@@ -126,4 +125,3 @@ import { RouterLink } from '@epikodelabs/routty';
   `,
 })
 export class ReportsPage {}
-

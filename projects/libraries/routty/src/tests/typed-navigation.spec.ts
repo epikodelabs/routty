@@ -13,10 +13,10 @@ class AuditPage {}
 
 const dashboardRoute = route('/dashboard/:projectId', DashboardPage, {
   name: 'dashboard',
-  paramsSchema: {
+  params: {
     projectId: s.number({ min: 1 }),
   },
-  querySchema: {
+  query: {
     tab: s.string('overview'),
     page: s.number({ default: 1, min: 1 }),
     filters: s.array(),
@@ -30,7 +30,7 @@ const auditRoute = route('/audit/:entryId', AuditPage, {
 
 const settingsRoute = route('/settings', SettingsPage, {
   name: 'settings',
-  querySchema: {
+  query: {
     section: s.string('general'),
   },
 });
@@ -94,17 +94,17 @@ describe('typed routes typings', () => {
   });
 });
 
-// @ts-expect-error paramsSchema keys must come from the literal route path
 route('/users/:userId', DashboardPage, {
-  paramsSchema: { accountId: s.number() },
+  // @ts-expect-error params keys must come from the literal route path
+  params: { accountId: s.number() },
 });
 
-// @ts-expect-error paramsSchema must declare every literal path parameter
 route('/teams/:teamId/users/:userId', DashboardPage, {
-  paramsSchema: { teamId: s.number() },
+  // @ts-expect-error params must declare every literal path parameter
+  params: { teamId: s.number() },
 });
 
-// @ts-expect-error routes without path parameters cannot declare paramsSchema
 route('/health', DashboardPage, {
-  paramsSchema: { id: s.string() },
+  // @ts-expect-error routes without path parameters cannot declare params
+  params: { id: s.string() },
 });

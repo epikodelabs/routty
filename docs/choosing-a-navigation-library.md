@@ -32,7 +32,7 @@ Use Waypoint when your application needs:
 - deep linking
 - browser history
 - layouts
-- lazy loading
+- eager server/client routing
 - typed URLs
 - route lifecycle
 - server-driven navigation
@@ -105,9 +105,7 @@ Although the navigation models differ, the ecosystem deliberately shares the sam
 ```ts
 route(...)
 layout(...)
-frame(...)
-lazyRoute(...)
-redirectRoute(...)
+redirect(...)
 ```
 
 Schemas are identical:
@@ -153,7 +151,7 @@ Waypoint asks:
 
 Routty asks:
 
-> How do I keep navigation flat while still composing the UI explicitly?
+> How do I use one eager route model on both server and client?
 
 Switchboard asks:
 

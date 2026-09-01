@@ -1,8 +1,8 @@
 import {
   createRouter,
   type Route,
-  type VanillaRouter,
-} from '@epikodelabs/routty';
+  type Router as VanillaRouter,
+} from '../lib/vanilla-router';
 
 import { idescribe } from './env.spec';
 

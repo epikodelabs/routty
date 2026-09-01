@@ -1,13 +1,8 @@
-import type { Type } from '@angular/core';
-
 import {
-  frame,
-  lazyFrame,
   layout,
   route,
 } from '../lib/route-builders';
 import type {
-  InferFrameData,
   InferNavigationPreparedData,
   InferRoutePreparedData,
 } from '../lib/navigation-definitions';
@@ -19,116 +14,90 @@ interface Project {
   readonly name: string;
 }
 
-describe('typed frame preparation', () => {
-  it('contextually types prepare callback context', () => {
-    frame(ProjectPage, {
-      prepare: [context => ({
-        preparedUrl: context.url.href,
-        aborted: context.signal.aborted,
-      })],
-    });
-  });
-
-  it('preserves prepare handlers at runtime', async () => {
-    const project: Project = {
-      id: 7,
-      name: 'Routty',
-    };
-
-    const view = frame(ProjectPage, {
-      prepare: [
-        async () => ({ project }),
-        () => ({ permissions: ['read'] as const }),
-      ],
-    });
-
-    const first = await view.prepare?.[0]?.({} as never);
-    const second = await view.prepare?.[1]?.({} as never);
-
-    expect(first).toEqual({ project });
-    expect(second).toEqual({ permissions: ['read'] });
-  });
-
-  it('supports the same inference for lazy frames', () => {
-    const view = lazyFrame(
-      async () => ProjectPage,
-      {
-        prepare: [
-          () => ({ projectId: 42 }),
-        ],
-        afterEnter: [activated => {
-          const projectId: number = activated.data.projectId;
-          expect(projectId).toBe(42);
-        }],
-      },
-    );
-
-    expect(view.kind).toBe('frame');
-  });
-});
-
 const project: Project = {
   id: 1,
   name: 'Typed preparation',
 };
 
-const projectFrame = frame(ProjectPage as Type<unknown>, {
+describe('typed route preparation', () => {
+  it('contextually types direct prepare callbacks', () => {
+    route('/projects/:projectId', ProjectPage, {
+      prepare: context => ({
+        preparedUrl: context.url.href,
+        aborted: context.signal.aborted,
+      }),
+    });
+  });
+
+  it('normalizes one prepare callback to an array', async () => {
+    const definition = route('/projects/:projectId', ProjectPage, {
+      prepare: () => ({ project }),
+    });
+
+    expect(definition.prepare?.length).toBe(1);
+    expect(await definition.prepare?.[0]?.({} as never)).toEqual({ project });
+  });
+
+  it('normalizes multiple lifecycle callbacks', () => {
+    const definition = route('/projects/:projectId', ProjectPage, {
+      prepare: [
+        async () => ({ project }),
+        () => ({ permissions: ['read', 'write'] as const }),
+      ],
+      afterEnter: activated => {
+        const name: string = activated.data.project.name;
+        const permission: 'read' | 'write' = activated.data.permissions[0];
+        void name;
+        void permission;
+
+        // @ts-expect-error prepare did not provide customer data
+        activated.data.customer;
+      },
+      beforeLeave: active => {
+        const id: number = active.data.project.id;
+        void id;
+        return true;
+      },
+    });
+
+    expect(definition.prepare?.length).toBe(2);
+    expect(definition.afterEnter?.length).toBe(1);
+    expect(definition.beforeLeave?.length).toBe(1);
+  });
+});
+
+const projectRoute = route('/projects/:projectId', ProjectPage, {
+  name: 'project',
   prepare: [
     async () => ({ project }),
     () => ({ permissions: ['read', 'write'] as const }),
   ],
-
-  afterEnter: [activated => {
-    const name: string = activated.data.project.name;
-    const permission: 'read' | 'write' = activated.data.permissions[0];
-    void name;
-    void permission;
-
-    // @ts-expect-error prepare did not provide a customer value
-    activated.data.customer;
-  }],
-
-  beforeLeave: [active => {
-    const id: number = active.data.project.id;
-    void id;
-    return true;
-  }],
 });
 
-const projectRoute = route('/projects/:projectId', projectFrame, {
-  name: 'project',
-});
-
-type ProjectFrameData = InferFrameData<typeof projectFrame>;
 type ProjectRouteData = InferRoutePreparedData<typeof projectRoute>;
 
-const frameData: ProjectFrameData = {
+const routeData: ProjectRouteData = {
   project,
   permissions: ['read', 'write'],
 };
-
-const routeData: ProjectRouteData = frameData;
 void routeData;
+
 const applicationRoutes = [
-  layout('/app', frame(ProjectPage, {
-    prepare: [
-      () => ({ session: { userId: 17 } }),
-      () => ({ featureFlags: ['projects'] as const }),
-    ],
-  }), [
-    route('/projects/:projectId', frame(ProjectPage, {
-      prepare: [
-        () => ({ project }),
-      ],
-    }), {
+  layout('/app', ProjectPage, [
+    route('/projects/:projectId', ProjectPage, {
       name: 'applicationProject',
       data: {
         section: 'projects' as const,
       },
+      prepare: () => ({ project }),
     }),
-  ]),
+  ], {
+    prepare: [
+      () => ({ session: { userId: 17 } }),
+      () => ({ featureFlags: ['projects'] as const }),
+    ],
+  }),
 ] as const;
-
 
 type ApplicationProjectData = InferNavigationPreparedData<
   typeof applicationRoutes,
@@ -140,7 +109,6 @@ const applicationProjectData: ApplicationProjectData = {
   featureFlags: ['projects'],
   project,
 };
-
 void applicationProjectData;
 
 // @ts-expect-error unknown route names do not expose arbitrary data
