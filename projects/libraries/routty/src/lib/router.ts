@@ -7,6 +7,7 @@ import {
   InjectionToken,
   inject,
   runInInjectionContext,
+  signal,
   type Provider,
 } from '@angular/core';
 
@@ -474,8 +475,8 @@ export class Router<TRoutes extends NavigationTree = any> {
   private readonly registry: ReturnType<typeof createRouteRegistry>;
   private engine: VanillaRouter | null = null;
   private currentState: RouterState = EMPTY_ROUTER_STATE;
+  private readonly stateSnapshot = signal<RouterState>(EMPTY_ROUTER_STATE);
   private readonly outlets = new Map<string, HTMLElement[]>();
-  private tickQueued = false;
 
   public readonly navigateTo: TypedNavigate<TRoutes>;
   public readonly hrefTo: TypedHref<TRoutes>;
@@ -503,7 +504,9 @@ export class Router<TRoutes extends NavigationTree = any> {
   }
 
   get state(): RouterState {
-    return this.currentState;
+    // Reading this getter in a template tracks the snapshot signal, allowing
+    // Angular to schedule only dependent views rather than a global tick.
+    return this.stateSnapshot();
   }
 
   get displayUrl(): string {
@@ -606,8 +609,7 @@ export class Router<TRoutes extends NavigationTree = any> {
       },
 
       onStateChange: (state) => {
-        this.currentState = snapshotRouterState(state);
-        this.requestTick();
+        this.setState(snapshotRouterState(state));
       },
 
       onOutletActivate: (target, component) => {
@@ -625,8 +627,7 @@ export class Router<TRoutes extends NavigationTree = any> {
 
     this.engine = engine;
 
-    this.currentState = snapshotRouterState(engine.state);
-    this.requestTick();
+    this.setState(snapshotRouterState(engine.state));
   }
 
   disconnect(name: string, outlet: HTMLElement): void {
@@ -701,7 +702,7 @@ export class Router<TRoutes extends NavigationTree = any> {
 
     engine?.dispose();
 
-    this.currentState = EMPTY_ROUTER_STATE;
+    this.setState(EMPTY_ROUTER_STATE);
   }
 
   private get baseHref(): string {
@@ -785,22 +786,9 @@ export class Router<TRoutes extends NavigationTree = any> {
     return registered?.[registered.length - 1] ?? null;
   }
 
-  private requestTick(): void {
-    if (this.tickQueued) {
-      return;
-    }
-
-    this.tickQueued = true;
-
-    queueMicrotask(() => {
-      this.tickQueued = false;
-
-      if (!this.engine) {
-        return;
-      }
-
-      this.appRef.tick();
-    });
+  private setState(state: RouterState): void {
+    this.currentState = state;
+    this.stateSnapshot.set(state);
   }
 }
 
