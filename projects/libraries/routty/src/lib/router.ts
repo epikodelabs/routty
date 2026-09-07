@@ -325,15 +325,20 @@ function adaptRoute(
     sourceRoute: route,
     data: route.data,
     viewTransition: route.viewTransition,
-    component: route.outlet
-      ? composeAngularLeafRouteView(appRef, documentRef, injector, tokens, resolveViews(layouts, route))
-      : composeAngularRouteView(appRef, documentRef, injector, tokens, resolveViews(layouts, route)),
-    prepare: Object.freeze([
-      ...(sharedPreparers ?? []),
-      ...(collectPreparers([route], injector) ?? []),
-    ]),
-    parseParams: adaptParamsParser(route, injector),
-    parseQuery: adaptQueryParser(route, injector),
+    // The vanilla engine currently owns the runtime component contract through
+    // `load()`. Routty's public route model remains eager: this adapter only
+    // packages the already-created view and hooks for that internal contract.
+    load: () => Promise.resolve({
+      component: route.outlet
+        ? composeAngularLeafRouteView(appRef, documentRef, injector, tokens, resolveViews(layouts, route))
+        : composeAngularRouteView(appRef, documentRef, injector, tokens, resolveViews(layouts, route)),
+      prepare: Object.freeze([
+        ...(sharedPreparers ?? []),
+        ...(collectPreparers([route], injector) ?? []),
+      ]),
+      parseParams: adaptParamsParser(route, injector),
+      parseQuery: adaptQueryParser(route, injector),
+    }),
   };
 }
 
