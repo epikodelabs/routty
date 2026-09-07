@@ -76,6 +76,20 @@ export const appConfig = {
 
 The same `routes` value is used when Angular renders the application on the server and when the hydrated browser handles later navigation.
 
+Your application root must import Routty's standalone outlet directive:
+
+```ts
+import { Component } from '@angular/core';
+import { RouterOutlet } from '@epikodelabs/routty';
+
+@Component({
+  standalone: true,
+  imports: [RouterOutlet],
+  template: '<router-outlet />',
+})
+export class AppComponent {}
+```
+
 ## Public route language
 
 Routty intentionally keeps route construction small:
@@ -104,6 +118,28 @@ A route may define:
 
 Lifecycle handlers accept either one function or an array. Routty normalizes them internally.
 
+`prepare` may be asynchronous. Its returned object is available as route data;
+multiple applicable handlers merge their returned objects in execution order. Keep
+lifecycle code SSR-safe: capture injected dependencies before an `await`, and do
+not read browser-only globals unless the code is guarded for the server.
+
+### Route inputs
+
+Routty binds these component inputs when they are declared with Angular's
+`input()` API or `@Input()`: `url`, `path`, `params`, `query`, `data`,
+`historyState`, and `config`. Parsed params and query values are therefore
+available without reading URL primitives in the component.
+
+```ts
+import { Component, input } from '@angular/core';
+
+@Component({ standalone: true, template: '{{ params().projectId }}' })
+export class ProjectPage {
+  readonly params = input.required<{ projectId: number }>();
+  readonly data = input<Record<string, unknown>>({});
+}
+```
+
 ### Named outlets
 
 Named outlets are authored on their primary destination:
@@ -117,6 +153,41 @@ route('/projects/:projectId', ProjectPage, {
 ```
 
 They share the primary route's path, params, query, layouts, and navigation transaction.
+
+### Typed links and imperative navigation
+
+Import the standalone `RouterLink` directive for templates. Named links and
+`navigateTo` calls are checked against the route catalog, including required
+params and query value types.
+
+```ts
+import { Component, inject } from '@angular/core';
+import { Router, RouterLink } from '@epikodelabs/routty';
+
+@Component({
+  standalone: true,
+  imports: [RouterLink],
+  template: `
+    <a [routerLink]="{ name: 'project', params: { projectId: 42 } }">
+      Open project
+    </a>
+  `,
+})
+export class ProjectLinkComponent {
+  private readonly router = inject(Router<typeof routes>);
+
+  open(): Promise<boolean> {
+    return this.router.navigateTo.project({
+      params: { projectId: 42 },
+      query: { tab: 'activity' },
+    });
+  }
+}
+```
+
+`router.hrefTo.project(...)` produces the equivalent typed href. Reading
+`router.state` in a template is reactive; it exposes the active route, pending
+state, phase, parsed params/query, prepared data, and navigation errors.
 
 ### Typed params and queries with `s`
 
