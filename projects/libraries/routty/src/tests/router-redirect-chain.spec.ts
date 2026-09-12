@@ -145,7 +145,7 @@ idescribe('Router redirect chains', () => {
     const source: Route = {
       path: 'source',
       load: async () => ({
-        canActivate: [
+        beforeEnter: [
           () => ({
             redirectTo: '/target',
             replace: false,
@@ -234,7 +234,7 @@ idescribe('Router redirect chains', () => {
     const source: Route = {
       path: 'source',
       load: async () => ({
-        canActivate: [
+        beforeEnter: [
           () => ({
             redirectTo:
               'https://external.test/path',

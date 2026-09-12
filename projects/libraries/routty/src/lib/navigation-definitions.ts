@@ -3,7 +3,7 @@ import type { ParamSchema, ParamSchemaRecord, QuerySchemaRecord } from './query-
 import type { ExtractPathParams } from './route-path';
 import type {
   ActivatedRoute,
-  CanActivateFn as RouterCanActivateFn,
+  BeforeEnterFn,
   DeactivationContext,
   GuardResult,
   NavigationContext,
@@ -62,7 +62,7 @@ export interface NavigationHooks<
   TPrepare extends HookList<PrepareFn> | undefined =
     HookList<PrepareFn> | undefined,
 > {
-  readonly beforeEnter?: HookList<RouterCanActivateFn>;
+  readonly beforeEnter?: HookList<BeforeEnterFn>;
   readonly beforeLeave?: HookList<BeforeLeaveFn<InferPreparedData<TPrepare>>>;
   readonly prepare?: TPrepare;
   readonly afterEnter?: HookList<AfterEnterFn<InferPreparedData<TPrepare>>>;
@@ -71,7 +71,7 @@ export interface NavigationHooks<
 export interface NormalizedNavigationHooks<
   TData extends RouteData = RouteData,
 > {
-  readonly beforeEnter?: readonly RouterCanActivateFn[];
+  readonly beforeEnter?: readonly BeforeEnterFn[];
   readonly beforeLeave?: readonly BeforeLeaveFn<TData>[];
   readonly prepare?: readonly PrepareFn[];
   readonly afterEnter?: readonly AfterEnterFn<TData>[];

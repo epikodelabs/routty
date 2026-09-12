@@ -51,8 +51,8 @@ import {
 } from './query-schema';
 
 import {
-  type CanActivateFn,
-  type CanDeactivateFn,
+  type BeforeEnterFn,
+  type BeforeLeaveFn,
   createRouter,
   type ActivatedRoute,
   type NavigationTransitionFn,
@@ -128,7 +128,7 @@ function execute<TContext, TResult>(
 }
 
 function adaptBeforeEnter(
-  handler: CanActivateFn,
+  handler: BeforeEnterFn,
   injector: EnvironmentInjector,
 ): NavigationTransitionFn {
   return (transition) =>
@@ -139,7 +139,7 @@ function adaptBeforeEnter(
 }
 
 function adaptBeforeLeave(
-  handler: CanDeactivateFn,
+  handler: BeforeLeaveFn,
   injector: EnvironmentInjector,
 ): NavigationTransitionFn {
   return (transition) => {
@@ -203,7 +203,7 @@ function adaptTransitions(
 
       transitions.push({
         to: route => route?.config.sourceRoute === primaryRoute,
-        beforeEnter: owner.beforeEnter?.map(handler => adaptBeforeEnter(handler as CanActivateFn, injector)),
+        beforeEnter: owner.beforeEnter?.map(handler => adaptBeforeEnter(handler as BeforeEnterFn, injector)),
         afterEnter: owner.afterEnter?.map(handler => adaptAfterEnter(handler as (route: ActivatedRoute) => MaybePromise<void>, injector)),
       });
     }
@@ -213,7 +213,7 @@ function adaptTransitions(
 
       transitions.push({
         from: route => route?.config.sourceRoute === primaryRoute,
-        beforeLeave: owner.beforeLeave.map(handler => adaptBeforeLeave(handler as CanDeactivateFn, injector)),
+        beforeLeave: owner.beforeLeave.map(handler => adaptBeforeLeave(handler as BeforeLeaveFn, injector)),
       });
     }
   }

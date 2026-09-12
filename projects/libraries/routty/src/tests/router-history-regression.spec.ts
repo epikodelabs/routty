@@ -73,7 +73,7 @@ idescribe('Router history rollback regressions', () => {
       load: async () => ({
         component: () =>
           document.createTextNode('Home'),
-        canDeactivate: [() => false],
+        beforeLeave: [() => false],
       }),
     };
 
@@ -101,7 +101,7 @@ idescribe('Router history rollback regressions', () => {
       load: async () => ({
         component: () =>
           document.createTextNode('Home'),
-        canDeactivate: [() => false],
+        beforeLeave: [() => false],
       }),
     };
 
@@ -134,7 +134,7 @@ idescribe('Router history rollback regressions', () => {
       load: async () => ({
         component: () =>
           document.createTextNode('Home'),
-        canDeactivate: [() => false],
+        beforeLeave: [() => false],
       }),
     };
 
@@ -226,14 +226,14 @@ idescribe('Router history rollback regressions', () => {
     expect(router.state.phase).toBeNull();
   });
 
-  it('restores a popstate destination when canDeactivate blocks back navigation', async () => {
+  it('restores a popstate destination when beforeLeave blocks back navigation', async () => {
     const home = route('', 'Home');
     const about: Route = {
       path: 'about',
       load: async () => ({
         component: () =>
           document.createTextNode('About'),
-        canDeactivate: [() => false],
+        beforeLeave: [() => false],
       }),
     };
 
