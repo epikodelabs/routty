@@ -270,21 +270,10 @@ export function parseParamsRecord(
   schema: Record<string, ParamSchema>,
   params: Record<string, string>,
 ): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-
-  for (const [key, spec] of Object.entries(schema)) {
-    const raw = params[key];
-
-    if (raw === undefined) {
-      throw new Error(
-        `Missing required path parameter "${key}".`,
-      );
-    }
-
-    result[key] = parseValue(spec, raw);
-  }
-
-  return Object.freeze(result);
+  return parseParams(
+    schema,
+    params,
+  );
 }
 
 function unwrapOptionalQuerySchema(

@@ -203,10 +203,7 @@ export class RouterLink implements OnChanges {
       return;
     }
 
-    if (
-      !this.queryParams &&
-      this.fragment === undefined
-    ) {
+    if (this.fragment === undefined) {
       this.href = href;
       return;
     }
@@ -217,18 +214,9 @@ export class RouterLink implements OnChanges {
         getRouterLocation(this.document).origin,
       );
 
-    if (this.queryParams) {
-      appendQueryParams(
-        url,
-        this.queryParams,
-      );
-    }
-
-    if (this.fragment !== undefined) {
-      url.hash = this.fragment
-        ? `#${this.fragment.replace(/^#/, '')}`
-        : '';
-    }
+    url.hash = this.fragment
+      ? `#${this.fragment.replace(/^#/, '')}`
+      : '';
 
     this.href =
       `${url.pathname}${url.search}${url.hash}`;

@@ -72,11 +72,11 @@ export type GuardResult =
       displayTarget?: string | URL;
     };
 
-export type CanActivateFn = (
+export type BeforeEnterFn = (
   route: NavigationContext,
 ) => MaybePromise<GuardResult>;
 
-export type CanDeactivateFn = (
+export type BeforeLeaveFn = (
   route: DeactivationContext,
 ) => MaybePromise<GuardResult>;
 
@@ -106,8 +106,8 @@ export type ParseRouteQuery = (
 
 export interface LoadedRoute {
   readonly component?: RouteComponent;
-  readonly canActivate?: CanActivateFn[];
-  readonly canDeactivate?: CanDeactivateFn[];
+  readonly beforeEnter?: BeforeEnterFn[];
+  readonly beforeLeave?: BeforeLeaveFn[];
   readonly prepare?: readonly PrepareRouteDataFn[];
   readonly parseParams?: ParseRouteParams;
   readonly parseQuery?: ParseRouteQuery;
@@ -128,8 +128,8 @@ export interface RedirectRoute extends RouteBase {
   readonly load?: never;
   readonly preload?: never;
   readonly viewTransition?: never;
-  readonly canActivate?: never;
-  readonly canDeactivate?: never;
+  readonly beforeEnter?: never;
+  readonly beforeLeave?: never;
   readonly prepare?: never;
 }
 
@@ -141,8 +141,8 @@ export interface RenderableRoute extends RouteBase {
   readonly redirectTo?: never;
   readonly preload?: boolean;
   readonly viewTransition?: boolean;
-  readonly canActivate?: CanActivateFn[];
-  readonly canDeactivate?: CanDeactivateFn[];
+  readonly beforeEnter?: BeforeEnterFn[];
+  readonly beforeLeave?: BeforeLeaveFn[];
   readonly prepare?: readonly PrepareRouteDataFn[];
 }
 
@@ -438,27 +438,29 @@ function readRawQuery(
   url: URL,
 ): RouteQuery {
   const values:
-    Record<string, string> = {};
+    Record<string, string | readonly string[]> = {};
 
-  url.searchParams.forEach(
-    (value, key) => {
-      values[key] = value;
-    },
-  );
+  for (const key of new Set(url.searchParams.keys())) {
+    const entries = url.searchParams.getAll(key);
+    values[key] =
+      entries.length > 1
+        ? Object.freeze([...entries])
+        : entries[0] ?? '';
+  }
 
   return Object.freeze(values);
 }
 
 
 function executeGuard(
-  guard: CanActivateFn,
+  guard: BeforeEnterFn,
   route: NavigationContext,
 ): MaybePromise<GuardResult> {
   return guard(route);
 }
 
 function executeDeactivationGuard(
-  guard: CanDeactivateFn,
+  guard: BeforeLeaveFn,
   route: DeactivationContext
 ): MaybePromise<GuardResult> {
   return guard(route);
@@ -664,8 +666,8 @@ function loadRoute(
       )
       .then(loaded => ({
         component: loaded.component,
-        canActivate: loaded.canActivate,
-        canDeactivate: loaded.canDeactivate,
+        beforeEnter: loaded.beforeEnter ?? route.beforeEnter,
+        beforeLeave: loaded.beforeLeave ?? route.beforeLeave,
         prepare: loaded.prepare ?? route.prepare,
         parseParams: loaded.parseParams,
         parseQuery: loaded.parseQuery,
@@ -1102,13 +1104,20 @@ export function createRouter(config: RouterConfig): Router {
       return;
     }
 
+    let committed = false;
+
     try {
       await Promise.resolve(
-        startViewTransition.call(transitionDocument, () => action()).finished,
+        startViewTransition.call(transitionDocument, () => {
+          committed = true;
+          action();
+        }).finished,
       );
     } catch (error) {
       trace('View transition failed', error);
-      action();
+      if (!committed) {
+        action();
+      }
     }
   }
 
@@ -1364,7 +1373,7 @@ export function createRouter(config: RouterConfig): Router {
     }, 0) ?? null;
   }
 
-  async function runCanDeactivateGuards(
+  async function runBeforeLeaveGuards(
     nextUrl: URL,
     signal: AbortSignal,
   ): Promise<GuardResult> {
@@ -1383,14 +1392,14 @@ export function createRouter(config: RouterConfig): Router {
       const loaded = await loadRoute(activeRoute.config);
       throwIfAborted(signal);
 
-      for (const guard of loaded.canDeactivate ?? []) {
+      for (const guard of loaded.beforeLeave ?? []) {
         const result = await executeDeactivationGuard(guard, context);
         throwIfAborted(signal);
         const redirect = readRedirect(result);
         if (redirect) {
           const redirectUrl = resolveAppUrl(redirect.redirectTo, 'href');
           if (redirectUrl.href === nextUrl.href) {
-            warn('Ignoring canDeactivate redirect to the pending URL', redirect.redirectTo);
+            warn('Ignoring beforeLeave redirect to the pending URL', redirect.redirectTo);
             continue;
           }
           return redirect;
@@ -1487,7 +1496,7 @@ export function createRouter(config: RouterConfig): Router {
 
     if (!match) {
       setPhase(request, 'guarding');
-      const deactivationResult = await runCanDeactivateGuards(request.url, signal);
+      const deactivationResult = await runBeforeLeaveGuards(request.url, signal);
       if (deactivationResult === false) {
         return { type: 'blocked', request };
       }
@@ -1598,7 +1607,7 @@ export function createRouter(config: RouterConfig): Router {
       return { type: 'redirect', request, ...beforeLeaveRedirect };
     }
 
-    const deactivationResult = await runCanDeactivateGuards(request.url, signal);
+    const deactivationResult = await runBeforeLeaveGuards(request.url, signal);
     if (deactivationResult === false) {
       return { type: 'blocked', request };
     }
@@ -1632,7 +1641,7 @@ export function createRouter(config: RouterConfig): Router {
         signal,
       };
 
-      for (const guard of loadedRoutes[index].canActivate ?? []) {
+      for (const guard of loadedRoutes[index].beforeEnter ?? []) {
         const result = await executeGuard(guard, context);
         throwIfAborted(signal);
         const redirect = readRedirect(result);
@@ -1818,7 +1827,7 @@ export function createRouter(config: RouterConfig): Router {
       setPhase(request, 'guarding');
 
       const deactivationResult =
-        await runCanDeactivateGuards(
+        await runBeforeLeaveGuards(
           request.url,
           signal,
         );

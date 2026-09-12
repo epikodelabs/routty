@@ -24,6 +24,53 @@ export function runWithInjector<TContext, TResult>(
   return runInInjectionContext(injector, () => Promise.resolve(handler(context)));
 }
 
+const routerLocationSubscribers = new Set<() => void>();
+let routerLocationListenersInstalled = false;
+
+function notifyRouterLocationSubscribers(): void {
+  for (const subscriber of [...routerLocationSubscribers]) {
+    subscriber();
+  }
+}
+
+function installRouterLocationListeners(): void {
+  if (
+    routerLocationListenersInstalled
+    || typeof window === 'undefined'
+  ) {
+    return;
+  }
+
+  window.addEventListener(
+    ROUTER_LOCATION_CHANGE_EVENT,
+    notifyRouterLocationSubscribers,
+  );
+  window.addEventListener(
+    'popstate',
+    notifyRouterLocationSubscribers,
+  );
+  routerLocationListenersInstalled = true;
+}
+
+function uninstallRouterLocationListeners(): void {
+  if (
+    !routerLocationListenersInstalled
+    || typeof window === 'undefined'
+  ) {
+    return;
+  }
+
+  window.removeEventListener(
+    ROUTER_LOCATION_CHANGE_EVENT,
+    notifyRouterLocationSubscribers,
+  );
+  window.removeEventListener(
+    'popstate',
+    notifyRouterLocationSubscribers,
+  );
+  routerLocationListenersInstalled = false;
+}
+
 export function watchRouterLocation(
   destroyRef: DestroyRef,
   refresh: () => void,
@@ -32,12 +79,15 @@ export function watchRouterLocation(
     return;
   }
 
-  const listener = () => refresh();
-  window.addEventListener(ROUTER_LOCATION_CHANGE_EVENT, listener);
-  window.addEventListener('popstate', listener);
+  const subscriber = () => refresh();
+  routerLocationSubscribers.add(subscriber);
+  installRouterLocationListeners();
 
   destroyRef.onDestroy(() => {
-    window.removeEventListener(ROUTER_LOCATION_CHANGE_EVENT, listener);
-    window.removeEventListener('popstate', listener);
+    routerLocationSubscribers.delete(subscriber);
+
+    if (routerLocationSubscribers.size === 0) {
+      uninstallRouterLocationListeners();
+    }
   });
 }

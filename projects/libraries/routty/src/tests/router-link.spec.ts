@@ -8,6 +8,7 @@ import {
   Router,
   provideRouter,
   route,
+  s,
 } from '@epikodelabs/routty';
 
 ensureAngularTestEnvironment();
@@ -60,6 +61,22 @@ class RouterLinkHostComponent {
   target = '/about';
 }
 
+
+@Component({
+  standalone: true,
+  imports: [RouterLink, RouterOutlet],
+  template: `
+    <a
+      [routerLink]="{ name: 'report' }"
+      [queryParams]="{ at: reportDate }"
+    >Report</a>
+    <router-outlet />
+  `,
+})
+class RouterLinkQueryHostComponent {
+  readonly reportDate = new Date('2026-09-12T09:30:00.000Z');
+}
+
 describe('RouterLink', () => {
   let router: Router;
 
@@ -109,4 +126,43 @@ describe('RouterLink', () => {
     expect(router.state.current?.path).toBe('/about');
     expect(host.textContent).toContain('About');
   });
+
+  it('serializes queryParams through the named route schema exactly once', async () => {
+    await TestBed.configureTestingModule({
+      imports: [
+        HomeComponent,
+        AboutComponent,
+        RouterLinkQueryHostComponent,
+      ],
+      providers: [
+        ...provideRouter([
+          route('/', HomeComponent),
+          route('/report', AboutComponent, {
+            name: 'report',
+            query: { at: s.date() },
+          }),
+        ]),
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(RouterLinkQueryHostComponent);
+    router = TestBed.inject(Router);
+
+    fixture.detectChanges();
+    await delay();
+    fixture.detectChanges();
+
+    const anchor = fixture.nativeElement.querySelector('a') as HTMLAnchorElement | null;
+    expect(anchor).not.toBeNull();
+
+    const href = anchor?.getAttribute('href') ?? '';
+    const url = new URL(href, window.location.origin);
+
+    expect(url.pathname).toBe('/report');
+    expect(url.searchParams.getAll('at')).toEqual([
+      '2026-09-12T09:30:00.000Z',
+    ]);
+  });
+
+
 });
